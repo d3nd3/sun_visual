@@ -167,13 +167,15 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
         float ndl = dot(n, normalize(sunDir));
         // Hard terminator — exaggerate day vs night
         float dayF = smoothstep(-0.02, 0.06, ndl);
-        vec3 day = texture2D(dayMap, vUv).rgb * 1.2;
+        vec3 day = texture2D(dayMap, vUv).rgb * 1.75;
         vec3 nightTex = texture2D(nightMap, vUv).rgb;
         // Near-black night with faint city lights only
-        vec3 night = vec3(0.008, 0.01, 0.02) + nightTex * 0.55;
+        vec3 night = vec3(0.008, 0.01, 0.02) + nightTex * 0.45;
         vec3 col = mix(night, day, dayF);
         float rim = pow(1.0 - max(dot(normalize(vNormal), vec3(0,0,1)), 0.0), 3.0);
-        col += vec3(0.3, 0.5, 1.0) * rim * 0.12 * dayF;
+        col += vec3(0.35, 0.55, 1.0) * rim * 0.14 * dayF;
+        // Boost lit side further without washing out night
+        col = mix(col, min(col * 1.15, vec3(1.0)), dayF);
         gl_FragColor = vec4(col, 1.0);
       }
     `,
