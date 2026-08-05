@@ -91,37 +91,6 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   ground.position.y = -0.02;
   scene.add(ground);
 
-  // Elevation guide rings (30° / 60°)
-  for (const el of [30, 60]) {
-    const rad = (el * Math.PI) / 180;
-    const y = Math.sin(rad) * 16;
-    const r = Math.cos(rad) * 16;
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(r - 0.06, r + 0.06, 64),
-      new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.12,
-        side: THREE.DoubleSide,
-      }),
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = y;
-    scene.add(ring);
-  }
-
-  const horizon = new THREE.Mesh(
-    new THREE.RingGeometry(18, 18.2, 64),
-    new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.4,
-    }),
-  );
-  horizon.rotation.x = -Math.PI / 2;
-  scene.add(horizon);
-
   const labelCanvas = (text: string, color: string, worldH = 2.2) => {
     const c = document.createElement('canvas');
     const ctx = c.getContext('2d')!;
@@ -137,11 +106,49 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     ctx.fillStyle = color;
     ctx.fillText(text, c.width / 2, c.height / 2);
     const spr = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }),
+      new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }),
     );
     spr.scale.set(worldH * (c.width / c.height), worldH, 1);
     return spr;
   };
+
+  // Elevation guide rings (30° / 60°) — altitude above horizon, not zenith
+  for (const el of [30, 60]) {
+    const rad = (el * Math.PI) / 180;
+    const y = Math.sin(rad) * 16;
+    const r = Math.cos(rad) * 16;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(r - 0.06, r + 0.06, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.18,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = y;
+    scene.add(ring);
+    const elLabel = labelCanvas(`${el}° elev`, '#ccddee', 1.4);
+    elLabel.position.set(0, y + 0.3, -r);
+    scene.add(elLabel);
+  }
+
+  const horizon = new THREE.Mesh(
+    new THREE.RingGeometry(18, 18.2, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.4,
+    }),
+  );
+  horizon.rotation.x = -Math.PI / 2;
+  scene.add(horizon);
+  const horizonLabel = labelCanvas('horizon 0°', '#ffffff', 1.5);
+  horizonLabel.position.set(0, 0.6, -18);
+  scene.add(horizonLabel);
+
   for (const { t, az, col } of [
     { t: 'N', az: 0, col: '#ff6666' },
     { t: 'E', az: 90, col: '#88aaff' },
@@ -154,16 +161,39 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     scene.add(spr);
   }
 
-  // Zenith marker
-  const zenithSpr = labelCanvas('ZENITH', '#44ff88', 3);
-  zenithSpr.position.set(0, 22, 0);
+  // Zenith = straight up (green). Zenith angle = angle from this line down to the sun.
+  const zenithSpr = labelCanvas('ZENITH (up)', '#44ff88', 2.2);
+  zenithSpr.position.set(0, 24, 0);
   scene.add(zenithSpr);
-  scene.add(
-    new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 20, 0)]),
-      new THREE.LineBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 0.5 }),
-    ),
+  const upRay = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0.1, 0),
+      new THREE.Vector3(0, 22, 0),
+    ]),
+    new THREE.LineBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 0.7 }),
   );
+  scene.add(upRay);
+
+  const ARC_R = 18;
+  const zenithArc = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xff8866 }),
+  );
+  scene.add(zenithArc);
+  const zenithWedge = new THREE.Mesh(
+    new THREE.BufferGeometry(),
+    new THREE.MeshBasicMaterial({
+      color: 0xff6644,
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  scene.add(zenithWedge);
+  let zenithAngleLabel = labelCanvas('zenith 0°', '#ff8866', 2);
+  zenithAngleLabel.userData.text = 'zenith 0°';
+  scene.add(zenithAngleLabel);
 
   const sun = new THREE.Mesh(
     new THREE.SphereGeometry(1.6, 24, 24),
@@ -326,16 +356,68 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     const p = enuToThree(e, n, u, PATH_R + 3);
     sun.position.copy(p);
     sunHalo.position.copy(p);
-    const up = pos.elevation > -6;
-    sun.visible = up;
-    sunHalo.visible = up;
-    sunBeam.visible = up;
-    if (up) {
+    const sunUp = pos.elevation > -6;
+    sun.visible = sunUp;
+    sunHalo.visible = sunUp;
+    sunBeam.visible = sunUp;
+    if (sunUp) {
       sunBeam.geometry.dispose();
       sunBeam.geometry = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0.1, 0),
         p.clone(),
       ]);
+    }
+
+    // Zenith angle wedge: from straight up (0,1,0) down to the sun
+    const upDir = new THREE.Vector3(0, 1, 0);
+    const sunDir = new THREE.Vector3(e, u, n).normalize();
+    const zenithRad = Math.acos(Math.min(1, Math.max(-1, upDir.dot(sunDir))));
+    const showZen = pos.elevation > -5;
+    zenithArc.visible = showZen;
+    zenithWedge.visible = showZen;
+    zenithAngleLabel.visible = showZen;
+    if (showZen) {
+      const axis = new THREE.Vector3().crossVectors(upDir, sunDir);
+      const arcPts: THREE.Vector3[] = [];
+      const wedgePts: THREE.Vector3[] = [new THREE.Vector3(0, 0.1, 0)];
+      if (axis.lengthSq() > 1e-8) {
+        axis.normalize();
+        for (let i = 0; i <= 32; i++) {
+          const dir = upDir.clone().applyAxisAngle(axis, (i / 32) * zenithRad).normalize();
+          const pt = dir.multiplyScalar(ARC_R);
+          arcPts.push(pt);
+          wedgePts.push(pt.clone());
+        }
+      }
+      zenithArc.geometry.dispose();
+      zenithArc.geometry = new THREE.BufferGeometry().setFromPoints(arcPts);
+      zenithWedge.geometry.dispose();
+      if (wedgePts.length >= 3) {
+        const positions: number[] = [];
+        for (let i = 1; i < wedgePts.length - 1; i++) {
+          positions.push(
+            wedgePts[0].x, wedgePts[0].y, wedgePts[0].z,
+            wedgePts[i].x, wedgePts[i].y, wedgePts[i].z,
+            wedgePts[i + 1].x, wedgePts[i + 1].y, wedgePts[i + 1].z,
+          );
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        zenithWedge.geometry = g;
+      }
+      const mid =
+        arcPts[Math.floor(arcPts.length / 2)] ??
+        upDir.clone().multiplyScalar(ARC_R);
+      const zLabel = `zenith ${pos.zenith.toFixed(0)}°`;
+      if (zenithAngleLabel.userData.text !== zLabel) {
+        scene.remove(zenithAngleLabel);
+        (zenithAngleLabel.material as THREE.SpriteMaterial).map?.dispose();
+        (zenithAngleLabel.material as THREE.Material).dispose();
+        zenithAngleLabel = labelCanvas(zLabel, '#ff8866', 2);
+        zenithAngleLabel.userData.text = zLabel;
+        scene.add(zenithAngleLabel);
+      }
+      zenithAngleLabel.position.copy(mid);
     }
 
     // Traveled portion of today's path (sunrise → now)
