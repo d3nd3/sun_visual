@@ -8,6 +8,7 @@ import {
   solarPosition,
   sunDirectionECEF,
   sunDirectionEcliptic,
+  sunTimes,
 } from '../astro/sun';
 import { setLocation, state, subscribe } from '../state';
 
@@ -350,11 +351,16 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     setAxis(eastLine, eastT, 0.28);
     setAxis(northLine, northT, 0.28);
 
-    // Sun ray: only when sun is above horizon (else it would cut through Earth)
+    // Sun ray: sunrise → sunset only (no line of sight at night)
     const sunT = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
     const zenithRad = Math.acos(Math.min(1, Math.max(-1, upT.dot(sunT))));
     const elev = 90 - (zenithRad * 180) / Math.PI;
-    sunRay.visible = elev > 0;
+    const times = sunTimes(state.lat, state.lon, state.datetime);
+    const t = state.datetime.getTime();
+    sunRay.visible =
+      times.sunrise && times.sunset
+        ? t >= times.sunrise.getTime() && t <= times.sunset.getTime()
+        : times.dayLengthHours === 24;
     if (sunRay.visible) setAxis(sunRay, sunT, SUN_LEN);
 
     const zenithHud = solarPosition(state.lat, state.lon, state.datetime).zenith;
