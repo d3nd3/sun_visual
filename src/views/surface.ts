@@ -162,7 +162,7 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   }
 
   // Zenith = straight up (green). Zenith angle = angle from this line down to the sun.
-  const zenithSpr = labelCanvas('ZENITH (up)', '#44ff88', 2.2);
+  const zenithSpr = labelCanvas('UP', '#44ff88', 2.2);
   zenithSpr.position.set(0, 24, 0);
   scene.add(zenithSpr);
   const upRay = new THREE.Line(
