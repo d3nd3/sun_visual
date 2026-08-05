@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#070b14" />
+    <title>SunVisualizer — Earth & Sun</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="controls"></aside>
+      <nav class="mobile-tabs" id="mobile-tabs">
+        <button type="button" data-view="orbital" class="active">Orbital</button>
+        <button type="button" data-view="surface">Surface</button>
+      </nav>
+      <div class="view active-mobile" id="orbital-view">
+        <div class="view-label">Orbital — tap to set location</div>
+      </div>
+      <div class="view" id="surface-view">
+        <div class="view-label">Surface — drag to look around</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
