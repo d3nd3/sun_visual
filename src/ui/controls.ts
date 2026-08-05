@@ -57,12 +57,14 @@ export function createControls(root: HTMLElement): () => void {
 
       <section>
         <label>Location <span id="latlon" class="mono"></span></label>
+        <label class="lat-slider-label">Latitude <span id="lat-slider-val" class="mono"></span></label>
+        <input type="range" id="lat-slider" min="-90" max="90" step="0.5" />
         <div class="row">
           <button type="button" id="geo-btn">Use my location</button>
           <button type="button" id="now-btn">Now</button>
         </div>
         <div class="row seasons" id="lat-presets"></div>
-        <p class="hint">Tap the globe, or jump latitude — sun arcs reshape with lat. Clock uses the zone’s DST.</p>
+        <p class="hint">Tap the globe, drag latitude, or jump presets — sun arcs reshape with lat. Clock uses the zone’s DST.</p>
       </section>
 
       <section>
@@ -159,6 +161,7 @@ export function createControls(root: HTMLElement): () => void {
   const $ = <T extends HTMLElement>(id: string) => root.querySelector('#' + id) as T;
   const dateInput = $<HTMLInputElement>('date-input');
   const timeSlider = $<HTMLInputElement>('time-slider');
+  const latSlider = $<HTMLInputElement>('lat-slider');
   const analemma = $<HTMLInputElement>('analemma');
   const seasonPaths = $<HTMLInputElement>('season-paths');
   const trackSun = document.querySelector('#track-sun') as HTMLInputElement;
@@ -168,6 +171,8 @@ export function createControls(root: HTMLElement): () => void {
 
   let syncing = false;
   const pad = (n: number) => String(n).padStart(2, '0');
+  const fmtLat = (lat: number) =>
+    `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'}`;
 
   function refresh(): void {
     syncing = true;
@@ -175,6 +180,8 @@ export function createControls(root: HTMLElement): () => void {
     const loc = toLocalParts(d, state.lat, state.lon);
     dateInput.value = `${loc.y}-${pad(loc.mo)}-${pad(loc.day)}`;
     timeSlider.value = String(loc.h * 60 + loc.m);
+    latSlider.value = String(state.lat);
+    $('lat-slider-val').textContent = fmtLat(state.lat);
     $('time-label').textContent = `${pad(loc.h)}:${pad(loc.m)}`;
     $('tz-label').textContent = `(${formatOffset(d, state.lat, state.lon)})`;
     $('latlon').textContent = `${state.lat.toFixed(2)}°, ${state.lon.toFixed(2)}°`;
@@ -216,6 +223,12 @@ export function createControls(root: HTMLElement): () => void {
     setDatetime(
       setLocalCivilTime(state.datetime, state.lat, state.lon, Math.floor(mins / 60), mins % 60),
     );
+  });
+
+  latSlider.addEventListener('input', () => {
+    if (syncing) return;
+    setLocation(Number(latSlider.value), state.lon);
+    requestLookAtSun();
   });
 
   $('btn-sunrise').addEventListener('click', () => {
