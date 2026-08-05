@@ -108,10 +108,6 @@ export function createControls(root: HTMLElement): () => void {
 
       <section>
         <label class="check">
-          <input type="checkbox" id="track-sun" checked />
-          Surface: auto point camera at sun
-        </label>
-        <label class="check">
           <input type="checkbox" id="season-paths" checked />
           Season sun paths (Jun / equinox / Dec) — compare arcs
         </label>

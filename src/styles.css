@@ -306,6 +306,30 @@ button.active {
   border-radius: 4px;
 }
 
+.view-corner-check {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text);
+  background: #070b14cc;
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(6px);
+}
+
+.view-corner-check input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
 .mobile-tabs {
   display: none;
 }
