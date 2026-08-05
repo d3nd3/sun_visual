@@ -27,22 +27,28 @@ export interface OrbitalView {
 
 function makeTextSprite(text: string, color: string, scale = 0.45): THREE.Sprite {
   const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 128;
   const ctx = c.getContext('2d')!;
-  ctx.clearRect(0, 0, 512, 128);
-  ctx.font = 'bold 64px sans-serif';
+  const font = 'bold 64px sans-serif';
+  ctx.font = font;
+  const padX = 48;
+  const padY = 28;
+  const tw = Math.ceil(ctx.measureText(text).width);
+  c.width = Math.max(128, tw + padX * 2);
+  c.height = 64 + padY * 2;
+  ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 8;
-  ctx.strokeText(text, 256, 64);
+  ctx.strokeText(text, c.width / 2, c.height / 2);
   ctx.fillStyle = color;
-  ctx.fillText(text, 256, 64);
+  ctx.fillText(text, c.width / 2, c.height / 2);
+  const aspect = c.width / c.height;
   const spr = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }),
   );
-  spr.scale.set(scale * 2, scale * 0.5, 1);
+  spr.scale.set(scale * aspect, scale, 1);
   return spr;
 }
 
