@@ -22,7 +22,7 @@ export const state: AppState = {
   playSpeed: 0,
   showAnalemma: false,
   showSeasonPaths: true,
-  trackSun: false,
+  trackSun: true,
   lookNonce: 0,
 };
 
