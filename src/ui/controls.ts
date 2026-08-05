@@ -130,12 +130,14 @@ export function createControls(root: HTMLElement): () => void {
         <div><i class="swatch sun"></i> Toward sun (from your pin)</div>
         <div><i class="swatch sub"></i> Sun → subsolar (sun straight overhead there)</div>
         <div><i class="swatch rays"></i> Parallel sun rays (same direction everywhere)</div>
+        <div><i class="swatch terminator"></i> Terminator (day/night line)</div>
         <p class="hint">
-          At equinox the tilted axis is sideways to those rays, so the day/night line
-          runs pole-to-pole and every latitude gets ~12 h of day.
+          At equinox the white terminator runs pole-to-pole (straight along a meridian
+          when you face it) — every latitude gets ~12&nbsp;h of day. At solstice it tips,
+          cutting short of the summer pole (24&nbsp;h day) and winter pole (24&nbsp;h night).
         </p>
         <div><i class="swatch angle"></i> Zenith angle wedge</div>
-        <div><i class="swatch axis"></i> Polar axis (spin)</div>
+        <div><i class="swatch axis"></i> Polar axis / Earth axis (true up) — N celestial pole in the sky</div>
         <div><i class="swatch ecliptic"></i> Ecliptic (orbit plane)</div>
         <div><i class="swatch equator"></i> Equator — sun overhead at equinox</div>
         <div><i class="swatch cancer"></i> Tropic of Cancer — sun overhead at Jun solstice</div>

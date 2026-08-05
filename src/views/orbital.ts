@@ -284,6 +284,17 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   latParallel(OBLIQUITY, 0xff8844, 0.9, 'Tropic of Cancer', '#ff8844');
   latParallel(-OBLIQUITY, 0x66bbff, 0.9, 'Tropic of Capricorn', '#66bbff');
 
+  // Day/night terminator = great circle ⊥ sun (pole-to-pole at equinox, tipped else)
+  const TERM_R = R * 1.016;
+  const terminator = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }),
+  );
+  earthSpin.add(terminator);
+  let termLabel = makeTextSprite('terminator', '#ffffff', 0.22);
+  termLabel.userData.text = 'terminator';
+  earthSpin.add(termLabel);
+
   const sunGroup = new THREE.Group();
   sunGroup.add(
     new THREE.Mesh(
@@ -498,6 +509,39 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     );
 
     subsolar.position.copy(sunLocal.clone().multiplyScalar(R * 1.02));
+
+    // Terminator ring in Earth frame: all surface points with n·sun = 0
+    {
+      let u = new THREE.Vector3(0, 1, 0).cross(sunLocal);
+      if (u.lengthSq() < 1e-8) u.set(1, 0, 0).cross(sunLocal);
+      u.normalize();
+      const v = new THREE.Vector3().crossVectors(sunLocal, u).normalize();
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 96; i++) {
+        const t = (i / 96) * Math.PI * 2;
+        pts.push(
+          u.clone().multiplyScalar(Math.cos(t) * TERM_R).addScaledVector(v, Math.sin(t) * TERM_R),
+        );
+      }
+      terminator.geometry.dispose();
+      terminator.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+
+      const decl = Math.asin(Math.min(1, Math.max(-1, sunLocal.y))) * (180 / Math.PI);
+      const straight = Math.abs(decl) < 2.5;
+      const text = straight ? 'terminator · pole-to-pole' : 'terminator · tipped';
+      if (termLabel.userData.text !== text) {
+        earthSpin.remove(termLabel);
+        (termLabel.material as THREE.SpriteMaterial).map?.dispose();
+        (termLabel.material as THREE.Material).dispose();
+        termLabel = makeTextSprite(text, '#ffffff', 0.22);
+        termLabel.userData.text = text;
+        earthSpin.add(termLabel);
+      }
+      // Anchor label near equator crossing (easy to read on the limb)
+      let best = pts[0];
+      for (const p of pts) if (Math.abs(p.y) < Math.abs(best.y)) best = p;
+      termLabel.position.copy(best.clone().multiplyScalar(1.1));
+    }
 
     earthSpin.updateWorldMatrix(true, false);
     subsolar.getWorldPosition(_subWorld);

@@ -201,6 +201,21 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   const celestialEqLabel = labelCanvas('celestial equator → E & W', '#ffffff', 2.1);
   scene.add(celestialEqLabel);
 
+  // Earth's spin axis → N/S celestial pole (elev = |lat|). Same cyan as orbital polar axis.
+  const earthAxis = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0x66ffcc, transparent: true, opacity: 0.85 }),
+  );
+  scene.add(earthAxis);
+  const poleMark = new THREE.Mesh(
+    new THREE.SphereGeometry(0.7, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0x66ffcc }),
+  );
+  scene.add(poleMark);
+  let earthAxisLabel = labelCanvas('Earth axis (true up)', '#66ffcc', 2.2);
+  earthAxisLabel.userData.text = 'Earth axis (true up)';
+  scene.add(earthAxisLabel);
+
   const ARC_R = 18;
   const zenithArc = new THREE.Line(
     new THREE.BufferGeometry(),
@@ -336,10 +351,39 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     return pts;
   }
 
+  function rebuildEarthAxis(): void {
+    const φ = (state.lat * Math.PI) / 180;
+    const useN = state.lat >= 0;
+    const elev = Math.abs(state.lat);
+    const pole = useN
+      ? enuToThree(0, Math.cos(φ), Math.sin(φ), PATH_R)
+      : enuToThree(0, -Math.cos(φ), -Math.sin(φ), PATH_R);
+    earthAxis.geometry.dispose();
+    earthAxis.geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0.1, 0),
+      pole,
+    ]);
+    poleMark.position.copy(pole);
+    poleMark.visible = elev > 1;
+    const text = useN ? 'Earth axis · N pole' : 'Earth axis · S pole';
+    if (earthAxisLabel.userData.text !== text) {
+      scene.remove(earthAxisLabel);
+      (earthAxisLabel.material as THREE.SpriteMaterial).map?.dispose();
+      (earthAxisLabel.material as THREE.Material).dispose();
+      earthAxisLabel = labelCanvas(text, '#66ffcc', 2.2);
+      earthAxisLabel.userData.text = text;
+      scene.add(earthAxisLabel);
+    }
+    earthAxisLabel.visible = elev > 1;
+    if (elev > 1) earthAxisLabel.position.copy(pole).multiplyScalar(1.08);
+  }
+
   function rebuildPaths(): void {
     const today = sampleDayPath(state.lat, state.lon, state.datetime);
     todayPath.geometry.dispose();
     todayPath.geometry = new THREE.BufferGeometry().setFromPoints(today);
+
+    rebuildEarthAxis();
 
     const eqPts = sampleCelestialEquator(state.lat);
     celestialEq.geometry.dispose();

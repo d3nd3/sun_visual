@@ -341,6 +341,9 @@ button.active {
 .swatch.sub {
   background: #ffee55;
 }
+.swatch.terminator {
+  background: #ffffff;
+}
 .swatch.rays {
   background: #ffcc66;
 }
