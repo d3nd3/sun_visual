@@ -15,7 +15,6 @@ import { setLocation, state, subscribe } from '../state';
 const R = 1;
 const UP_LEN = 2.8;
 const SUN_DIST = 48; // far enough that parallel sun-rays hit the sun mesh (no parallax)
-const SUN_LEN = SUN_DIST - 1.5;
 const AXIS_LEN = 1.85;
 const ARC_R = 2.2;
 const ε = (OBLIQUITY * Math.PI) / 180;
@@ -60,7 +59,8 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   // Ecliptic frame: XZ = solar plane, Y = ecliptic north
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
   camera.up.set(0, 1, 0);
-  camera.position.set(0, 0, 3.6);
+  // Sit where Earth + fixed sun (+X) are both in frame on the ecliptic
+  camera.position.set(2.4, 0, 2.8);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -368,7 +368,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     setAxis(eastLine, eastT, 0.28);
     setAxis(northLine, northT, 0.28);
 
-    // Sun ray: sunrise → sunset only (no line of sight at night)
+    // Sun ray: aim at the sun mesh (not parallel approx — that missed it after season yaw)
     const sunT = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
     const zenithRad = Math.acos(Math.min(1, Math.max(-1, upT.dot(sunT))));
     const elev = 90 - (zenithRad * 180) / Math.PI;
@@ -378,7 +378,11 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       times.sunrise && times.sunset
         ? t >= times.sunrise.getTime() && t <= times.sunset.getTime()
         : times.dayLengthHours === 24;
-    if (sunRay.visible) setAxis(sunRay, sunT, SUN_LEN);
+    if (sunRay.visible) {
+      earthSpin.updateWorldMatrix(true, false);
+      const localSun = earthSpin.worldToLocal(sunGroup.position.clone());
+      sunRay.geometry.setFromPoints([pos.clone(), localSun]);
+    }
 
     const zenithHud = solarPosition(state.lat, state.lon, state.datetime).zenith;
 
