@@ -54,7 +54,7 @@ function makeTextSprite(text: string, color: string, scale = 0.45): THREE.Sprite
 
 export function createOrbitalView(container: HTMLElement): OrbitalView {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x02040a);
+  scene.background = new THREE.Color(0x1a2440);
 
   // Ecliptic frame: XZ = solar plane, Y = ecliptic north
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
@@ -166,12 +166,15 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       void main() {
         vec3 n = normalize(vWorld);
         float ndl = dot(n, normalize(sunDir));
-        float dayF = smoothstep(-0.08, 0.12, ndl);
-        vec3 day = texture2D(dayMap, vUv).rgb;
-        vec3 night = texture2D(nightMap, vUv).rgb * 1.35;
+        // Hard terminator — exaggerate day vs night
+        float dayF = smoothstep(-0.02, 0.06, ndl);
+        vec3 day = texture2D(dayMap, vUv).rgb * 1.2;
+        vec3 nightTex = texture2D(nightMap, vUv).rgb;
+        // Near-black night with faint city lights only
+        vec3 night = vec3(0.008, 0.01, 0.02) + nightTex * 0.55;
         vec3 col = mix(night, day, dayF);
         float rim = pow(1.0 - max(dot(normalize(vNormal), vec3(0,0,1)), 0.0), 3.0);
-        col += vec3(0.25, 0.45, 0.9) * rim * 0.15 * dayF;
+        col += vec3(0.3, 0.5, 1.0) * rim * 0.12 * dayF;
         gl_FragColor = vec4(col, 1.0);
       }
     `,
