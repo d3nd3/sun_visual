@@ -15,6 +15,7 @@ const R = 1;
 const UP_LEN = 0.75;
 const SUN_LEN = 0.95;
 const AXIS_LEN = 1.85;
+const ε = (OBLIQUITY * Math.PI) / 180;
 
 export interface OrbitalView {
   render: () => void;
@@ -47,8 +48,10 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x02040a);
 
+  // Ecliptic frame: XZ = solar plane, Y = ecliptic north
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  camera.position.set(0.5, 1.2, 3.5);
+  camera.up.set(0, 1, 0);
+  camera.position.set(0, 0, 3.6);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -63,9 +66,14 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.minDistance = 1.6;
-  controls.maxDistance = 8;
+  controls.minDistance = 1.8;
+  controls.maxDistance = 9;
   controls.enablePan = false;
+  // Lock orbit to the solar/ecliptic plane so axial tilt stays obvious
+  controls.minPolarAngle = Math.PI / 2;
+  controls.maxPolarAngle = Math.PI / 2;
+  controls.target.set(0, 0, 0);
+  controls.update();
 
   const starGeo = new THREE.BufferGeometry();
   const starPos = new Float32Array(1200 * 3);
@@ -84,6 +92,37 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       new THREE.PointsMaterial({ color: 0xffffff, size: 0.05, sizeAttenuation: true }),
     ),
   );
+
+  // Solar plane disc (ecliptic) — camera is locked into this plane
+  const solarDisc = new THREE.Mesh(
+    new THREE.RingGeometry(R * 1.08, 2.8, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0xf0b429,
+      transparent: true,
+      opacity: 0.07,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  solarDisc.rotation.x = -Math.PI / 2;
+  scene.add(solarDisc);
+
+  const ecliptic = new THREE.Mesh(
+    new THREE.RingGeometry(R * 1.12, R * 1.16, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0xf0b429,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  ecliptic.rotation.x = -Math.PI / 2;
+  scene.add(ecliptic);
+
+  const planeLabel = makeTextSprite('solar / ecliptic plane', '#f0b429', 0.4);
+  planeLabel.position.set(0, 0.02, 2.35);
+  scene.add(planeLabel);
 
   const loader = new THREE.TextureLoader();
   const base = import.meta.env.BASE_URL;
@@ -130,9 +169,13 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     `,
   });
 
-  // Earth stays fixed in ECEF — only the sun direction moves (no quaternion flips)
+  // Tip geographic north (local Y) toward +X by obliquity — visible from solar-plane camera
+  const earthTilt = new THREE.Group();
+  earthTilt.rotation.z = ε;
+  scene.add(earthTilt);
+
   const earth = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 64), earthMat);
-  scene.add(earth);
+  earthTilt.add(earth);
 
   const atmo = new THREE.Mesh(
     new THREE.SphereGeometry(R * 1.018, 48, 48),
@@ -162,9 +205,9 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       `,
     }),
   );
-  scene.add(atmo);
+  earthTilt.add(atmo);
 
-  // Polar axis through N/S poles (Earth's spin axis) — extends beyond the sphere
+  // Polar axis in Earth frame (through geographic N/S) — leans vs solar plane
   const polarAxis = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(0, -AXIS_LEN, 0),
@@ -172,45 +215,30 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     ]),
     new THREE.LineBasicMaterial({ color: 0x66ffcc }),
   );
-  scene.add(polarAxis);
+  earthTilt.add(polarAxis);
   const nPole = makeTextSprite('N pole', '#66ffcc', 0.35);
   nPole.position.set(0, AXIS_LEN + 0.08, 0);
-  scene.add(nPole);
+  earthTilt.add(nPole);
   const sPole = makeTextSprite('S pole', '#66ffcc', 0.35);
   sPole.position.set(0, -AXIS_LEN - 0.08, 0);
-  scene.add(sPole);
+  earthTilt.add(sPole);
 
-  // Equatorial ring (perpendicular to spin axis)
+  const tiltBadge = makeTextSprite(`axis tilt ${OBLIQUITY.toFixed(1)}°`, '#66ffcc', 0.36);
+  tiltBadge.position.set(0.55, AXIS_LEN * 0.55, 0);
+  earthTilt.add(tiltBadge);
+
   const eqRing = new THREE.Mesh(
-    new THREE.RingGeometry(R * 1.05, R * 1.07, 64),
+    new THREE.RingGeometry(R * 1.04, R * 1.07, 64),
     new THREE.MeshBasicMaterial({
       color: 0x88aacc,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.4,
       side: THREE.DoubleSide,
       depthWrite: false,
     }),
   );
   eqRing.rotation.x = Math.PI / 2;
-  scene.add(eqRing);
-
-  // Ecliptic ring tipped by obliquity — shows the axial tilt vs orbit plane
-  const ecliptic = new THREE.Mesh(
-    new THREE.RingGeometry(R * 1.12, R * 1.14, 64),
-    new THREE.MeshBasicMaterial({
-      color: 0xf0b429,
-      transparent: true,
-      opacity: 0.45,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  );
-  ecliptic.rotation.x = Math.PI / 2;
-  ecliptic.rotation.z = (OBLIQUITY * Math.PI) / 180;
-  scene.add(ecliptic);
-  const tiltLabel = makeTextSprite(`tilt ${OBLIQUITY.toFixed(1)}°`, '#f0b429', 0.32);
-  tiltLabel.position.set(0, 0.15, R * 1.25);
-  scene.add(tiltLabel);
+  earthTilt.add(eqRing);
 
   const sunGroup = new THREE.Group();
   sunGroup.add(
@@ -269,13 +297,13 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   let angleLabel = makeTextSprite('zenith 0°', '#ff8866', 0.55);
   angleLabel.userData.text = 'zenith 0°';
   markerGroup.add(angleLabel);
-  scene.add(markerGroup);
+  earthTilt.add(markerGroup);
 
   const subsolar = new THREE.Mesh(
     new THREE.SphereGeometry(0.028, 12, 12),
     new THREE.MeshBasicMaterial({ color: 0xffee55 }),
   );
-  scene.add(subsolar);
+  earthTilt.add(subsolar);
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -366,12 +394,13 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   }
 
   function updateSun(): void {
-    // Smooth: move light/sun around a fixed upright Earth (no globe flipping)
-    const dir = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
-    earthMat.uniforms.sunDir.value.copy(dir);
-    (atmo.material as THREE.ShaderMaterial).uniforms.sunDir.value.copy(dir);
-    sunGroup.position.copy(dir.clone().multiplyScalar(6));
-    subsolar.position.copy(dir.clone().multiplyScalar(R * 1.02));
+    // Sun direction in geographic (Earth-local) frame, then into world via tilt
+    const sunLocal = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
+    const sunWorld = sunLocal.clone().applyQuaternion(earthTilt.quaternion);
+    earthMat.uniforms.sunDir.value.copy(sunWorld);
+    (atmo.material as THREE.ShaderMaterial).uniforms.sunDir.value.copy(sunWorld);
+    sunGroup.position.copy(sunWorld.clone().multiplyScalar(6));
+    subsolar.position.copy(sunLocal.clone().multiplyScalar(R * 1.02));
   }
 
   function onPointer(e: PointerEvent): void {
@@ -387,8 +416,8 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObject(earth);
       if (!hits.length) return;
-      const p = hits[0].point.clone().normalize();
-      const { lat, lon } = ecefToLatLon(...threeToEcef(p));
+      const local = earthTilt.worldToLocal(hits[0].point.clone()).normalize();
+      const { lat, lon } = ecefToLatLon(...threeToEcef(local));
       setLocation(lat, lon);
     };
     window.addEventListener('pointerup', onUp);
@@ -406,6 +435,8 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     render() {
       updateSun();
       updateMarker();
+      // Keep orbit axis = ecliptic north
+      camera.up.set(0, 1, 0);
       controls.update();
       renderer.render(scene, camera);
     },
