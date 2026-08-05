@@ -6,9 +6,8 @@ import {
   latLonToECEF,
   OBLIQUITY,
   solarPosition,
-  subsolarLongitude,
+  sunDirectionECEF,
   sunDirectionEcliptic,
-  sunENU,
 } from '../astro/sun';
 import { setLocation, state, subscribe } from '../state';
 
@@ -18,7 +17,6 @@ const SUN_LEN = 4.8;
 const AXIS_LEN = 1.85;
 const ARC_R = 2.2;
 const ε = (OBLIQUITY * Math.PI) / 180;
-const DEG = Math.PI / 180;
 
 export interface OrbitalView {
   render: () => void;
@@ -349,22 +347,21 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     setAxis(eastLine, eastT, 0.28);
     setAxis(northLine, northT, 0.28);
 
-    const [e, n, u] = sunENU(state.lat, state.lon, state.datetime);
-    const sunEcef: [number, number, number] = [
-      east[0] * e + north[0] * n + up[0] * u,
-      east[1] * e + north[1] * n + up[1] * u,
-      east[2] * e + north[2] * n + up[2] * u,
-    ];
-    const sunT = ecefToThree(sunEcef).normalize();
+    // Sun ray: geographic sun direction (= points at ecliptic sun after correct spin/tilt)
+    const sunT = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
     setAxis(sunRay, sunT, SUN_LEN);
 
-    const zenith = solarPosition(state.lat, state.lon, state.datetime).zenith;
+    // Zenith angle = angle between local up and sun direction
+    const zenithRad = Math.acos(Math.min(1, Math.max(-1, upT.dot(sunT))));
+    const zenith = (zenithRad * 180) / Math.PI;
     const elev = 90 - zenith;
+    // Keep readout consistent with astronomy module (should match)
+    const zenithHud = solarPosition(state.lat, state.lon, state.datetime).zenith;
 
     const axis = new THREE.Vector3().crossVectors(upT, sunT);
     const arcPts: THREE.Vector3[] = [];
     const wedgePts: THREE.Vector3[] = [pos.clone()];
-    const maxAng = Math.min(Math.PI, Math.acos(Math.min(1, Math.max(-1, upT.dot(sunT)))));
+    const maxAng = Math.min(Math.PI, zenithRad);
     if (axis.lengthSq() > 1e-8) {
       axis.normalize();
       for (let i = 0; i <= 28; i++) {
@@ -398,7 +395,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     const mid =
       arcPts[Math.floor(arcPts.length / 2)] ??
       pos.clone().add(upT.clone().multiplyScalar(ARC_R * 1.1));
-    const label = elev < -0.5 ? 'night' : `zenith ${zenith.toFixed(0)}°`;
+    const label = elev < -0.5 ? 'night' : `zenith ${zenithHud.toFixed(0)}°`;
     if (angleLabel.userData.text !== label) {
       markerGroup.remove(angleLabel);
       (angleLabel.material as THREE.SpriteMaterial).map?.dispose();
@@ -418,14 +415,18 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     (atmo.material as THREE.ShaderMaterial).uniforms.sunDir.value.copy(sunWorld);
     sunGroup.position.copy(sunWorld.clone().multiplyScalar(6));
 
-    // Spin Earth so the subsolar meridian faces the sun
-    const subLon = subsolarLongitude(state.datetime);
-    const sunAng = Math.atan2(sz, sx); // ecliptic azimuth of sun
-    // Geographic lon maps to Three angle −lon; align that with sunAng
-    earthSpin.rotation.y = sunAng + subLon * DEG;
+    // Spin Earth so geographic sun-direction maps onto the ecliptic sun
+    // (tilt is Rx(ε); solve Ry(φ) so Rx(ε)·Ry(φ)·sunLocal = sunWorld)
+    const sunLocal = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
+    const target = sunWorld.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), -ε);
+    const from = new THREE.Vector3(sunLocal.x, 0, sunLocal.z).normalize();
+    const to = new THREE.Vector3(target.x, 0, target.z).normalize();
+    earthSpin.rotation.y = Math.atan2(
+      from.z * to.x - from.x * to.z,
+      from.x * to.x + from.z * to.z,
+    );
 
-    const decl = solarPosition(state.lat, state.lon, state.datetime).declination;
-    subsolar.position.copy(ecefToThree(latLonToECEF(decl, subLon)).multiplyScalar(R * 1.02));
+    subsolar.position.copy(sunLocal.clone().multiplyScalar(R * 1.02));
   }
 
   function onPointer(e: PointerEvent): void {
