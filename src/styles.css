@@ -115,6 +115,12 @@ body {
 .swatch.angle {
   background: #ff6644;
 }
+.swatch.axis {
+  background: #66ffcc;
+}
+.swatch.ecliptic {
+  background: #f0b429;
+}
 .swatch.path-today {
   background: #ffdd55;
 }
