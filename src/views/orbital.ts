@@ -13,9 +13,10 @@ import {
 import { setLocation, state, subscribe } from '../state';
 
 const R = 1;
-const UP_LEN = 0.75;
-const SUN_LEN = 0.95;
+const UP_LEN = 2.8;
+const SUN_LEN = 4.8;
 const AXIS_LEN = 1.85;
+const ARC_R = 2.2;
 const ε = (OBLIQUITY * Math.PI) / 180;
 const DEG = Math.PI / 180;
 
@@ -25,22 +26,22 @@ export interface OrbitalView {
   dispose: () => void;
 }
 
-function makeTextSprite(text: string, color: string, scale = 0.45): THREE.Sprite {
+function makeTextSprite(text: string, color: string, scale = 0.28): THREE.Sprite {
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d')!;
-  const font = 'bold 64px sans-serif';
+  const font = 'bold 42px sans-serif';
   ctx.font = font;
-  const padX = 48;
-  const padY = 28;
+  const padX = 36;
+  const padY = 20;
   const tw = Math.ceil(ctx.measureText(text).width);
-  c.width = Math.max(128, tw + padX * 2);
-  c.height = 64 + padY * 2;
+  c.width = Math.max(96, tw + padX * 2);
+  c.height = 42 + padY * 2;
   ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = '#000';
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 5;
   ctx.strokeText(text, c.width / 2, c.height / 2);
   ctx.fillStyle = color;
   ctx.fillText(text, c.width / 2, c.height / 2);
@@ -128,7 +129,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   ecliptic.rotation.x = -Math.PI / 2;
   scene.add(ecliptic);
 
-  const planeLabel = makeTextSprite('solar / ecliptic plane', '#f0b429', 0.4);
+  const planeLabel = makeTextSprite('solar / ecliptic plane', '#f0b429', 0.22);
   planeLabel.position.set(0, 0.02, 2.35);
   scene.add(planeLabel);
 
@@ -232,14 +233,14 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     new THREE.LineBasicMaterial({ color: 0x66ffcc }),
   );
   earthSpin.add(polarAxis);
-  const nPole = makeTextSprite('N pole', '#66ffcc', 0.35);
+  const nPole = makeTextSprite('N pole', '#66ffcc', 0.2);
   nPole.position.set(0, AXIS_LEN + 0.08, 0);
   earthSpin.add(nPole);
-  const sPole = makeTextSprite('S pole', '#66ffcc', 0.35);
+  const sPole = makeTextSprite('S pole', '#66ffcc', 0.2);
   sPole.position.set(0, -AXIS_LEN - 0.08, 0);
   earthSpin.add(sPole);
 
-  const tiltBadge = makeTextSprite(`axis tilt ${OBLIQUITY.toFixed(1)}°`, '#66ffcc', 0.36);
+  const tiltBadge = makeTextSprite(`axis tilt ${OBLIQUITY.toFixed(1)}°`, '#66ffcc', 0.2);
   tiltBadge.position.set(0.55, AXIS_LEN * 0.55, 0);
   earthSpin.add(tiltBadge);
 
@@ -310,7 +311,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   );
   markerGroup.add(angleArc);
 
-  let angleLabel = makeTextSprite('zenith 0°', '#ff8866', 0.55);
+  let angleLabel = makeTextSprite('zenith 0°', '#ff8866', 0.3);
   angleLabel.userData.text = 'zenith 0°';
   markerGroup.add(angleLabel);
   earthSpin.add(markerGroup);
@@ -368,7 +369,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       axis.normalize();
       for (let i = 0; i <= 28; i++) {
         const dir = upT.clone().applyAxisAngle(axis, (i / 28) * maxAng).normalize();
-        const p = pos.clone().add(dir.multiplyScalar(0.58));
+        const p = pos.clone().add(dir.multiplyScalar(ARC_R));
         arcPts.push(p);
         wedgePts.push(p.clone());
       }
@@ -396,13 +397,13 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
 
     const mid =
       arcPts[Math.floor(arcPts.length / 2)] ??
-      pos.clone().add(upT.clone().multiplyScalar(0.65));
+      pos.clone().add(upT.clone().multiplyScalar(ARC_R * 1.1));
     const label = elev < -0.5 ? 'night' : `zenith ${zenith.toFixed(0)}°`;
     if (angleLabel.userData.text !== label) {
       markerGroup.remove(angleLabel);
       (angleLabel.material as THREE.SpriteMaterial).map?.dispose();
       (angleLabel.material as THREE.Material).dispose();
-      angleLabel = makeTextSprite(label, elev < -0.5 ? '#8899aa' : '#ff8866', 0.55);
+      angleLabel = makeTextSprite(label, elev < -0.5 ? '#8899aa' : '#ff8866', 0.3);
       angleLabel.userData.text = label;
       markerGroup.add(angleLabel);
     }
