@@ -302,6 +302,38 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   );
   scene.add(sunGroup);
 
+  // Parallel sunlight (sun at +X → rays along −X). Fixed in world; Earth seasons under them.
+  const parallelRays = new THREE.Group();
+  {
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xffcc66,
+      transparent: true,
+      opacity: 0.5,
+    });
+    const xNear = R * 1.08; // day-side limb
+    const xFar = 14; // toward the sun
+    const zs = [-1.5, -1.0, -0.5, 0, 0.5, 1.0, 1.5];
+    const ys = [-0.85, 0, 0.85];
+    for (const y of ys) {
+      for (const z of zs) {
+        if (y !== 0 && Math.abs(z) > 1.05) continue; // keep a clean bundle
+        parallelRays.add(
+          new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([
+              new THREE.Vector3(xFar, y, z),
+              new THREE.Vector3(xNear, y, z),
+            ]),
+            mat,
+          ),
+        );
+      }
+    }
+    const rayLabel = makeTextSprite('parallel sun rays', '#ffcc66', 0.22);
+    rayLabel.position.set(8, 1.15, 0);
+    parallelRays.add(rayLabel);
+  }
+  scene.add(parallelRays);
+
   const markerGroup = new THREE.Group();
   const pin = new THREE.Mesh(
     new THREE.SphereGeometry(0.028, 12, 12),

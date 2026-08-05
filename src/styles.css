@@ -341,6 +341,9 @@ button.active {
 .swatch.sub {
   background: #ffee55;
 }
+.swatch.rays {
+  background: #ffcc66;
+}
 
 .view {
   position: relative;

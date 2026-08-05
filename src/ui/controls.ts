@@ -129,6 +129,11 @@ export function createControls(root: HTMLElement): () => void {
         <div><i class="swatch up"></i> Up (zenith) + up arc (east→west through zenith)</div>
         <div><i class="swatch sun"></i> Toward sun (from your pin)</div>
         <div><i class="swatch sub"></i> Sun → subsolar (sun straight overhead there)</div>
+        <div><i class="swatch rays"></i> Parallel sun rays (same direction everywhere)</div>
+        <p class="hint">
+          At equinox the tilted axis is sideways to those rays, so the day/night line
+          runs pole-to-pole and every latitude gets ~12 h of day.
+        </p>
         <div><i class="swatch angle"></i> Zenith angle wedge</div>
         <div><i class="swatch axis"></i> Polar axis (spin)</div>
         <div><i class="swatch ecliptic"></i> Ecliptic (orbit plane)</div>
