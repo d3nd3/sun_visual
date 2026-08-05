@@ -405,19 +405,20 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
         g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         zenithWedge.geometry = g;
       }
-      const mid =
-        arcPts[Math.floor(arcPts.length / 2)] ??
-        upDir.clone().multiplyScalar(ARC_R);
       const zLabel = `zenith ${pos.zenith.toFixed(0)}°`;
       if (zenithAngleLabel.userData.text !== zLabel) {
         scene.remove(zenithAngleLabel);
         (zenithAngleLabel.material as THREE.SpriteMaterial).map?.dispose();
         (zenithAngleLabel.material as THREE.Material).dispose();
-        zenithAngleLabel = labelCanvas(zLabel, '#ff8866', 2);
+        zenithAngleLabel = labelCanvas(zLabel, '#ff8866', 2.4);
         zenithAngleLabel.userData.text = zLabel;
         scene.add(zenithAngleLabel);
       }
-      zenithAngleLabel.position.copy(mid);
+      // Sit beside the sun so the reading stays in view when camera tracks it
+      const side = new THREE.Vector3().crossVectors(sunDir, upDir);
+      if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+      else side.normalize();
+      zenithAngleLabel.position.copy(p).add(side.multiplyScalar(6));
     }
 
     // Traveled portion of today's path (sunrise → now)
