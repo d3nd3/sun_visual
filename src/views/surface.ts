@@ -174,6 +174,24 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   );
   scene.add(upRay);
 
+  // Up arc = east → zenith → west (prime vertical). Flat E–W, not slanted like sun paths.
+  {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 64; i++) {
+      const φ = (i / 64) * Math.PI; // 0 = east horizon, π/2 = zenith, π = west
+      pts.push(new THREE.Vector3(Math.cos(φ), Math.sin(φ), 0).multiplyScalar(PATH_R));
+    }
+    scene.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 0.75 }),
+      ),
+    );
+    const upArcLabel = labelCanvas('up arc (E→W)', '#44ff88', 2.2);
+    upArcLabel.position.set(0, PATH_R * 1.08, 0);
+    scene.add(upArcLabel);
+  }
+
   const ARC_R = 18;
   const zenithArc = new THREE.Line(
     new THREE.BufferGeometry(),

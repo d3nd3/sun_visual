@@ -124,7 +124,7 @@ export function createControls(root: HTMLElement): () => void {
       </section>
 
       <section class="legend">
-        <div><i class="swatch up"></i> Up (zenith)</div>
+        <div><i class="swatch up"></i> Up (zenith) + up arc (east→west through zenith)</div>
         <div><i class="swatch sun"></i> Toward sun</div>
         <div><i class="swatch angle"></i> Zenith angle wedge</div>
         <div><i class="swatch axis"></i> Polar axis (spin)</div>
