@@ -122,17 +122,25 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   horizon.rotation.x = -Math.PI / 2;
   scene.add(horizon);
 
-  const labelCanvas = (text: string, color: string) => {
+  const labelCanvas = (text: string, color: string, worldH = 2.2) => {
     const c = document.createElement('canvas');
-    c.width = 128;
-    c.height = 128;
     const ctx = c.getContext('2d')!;
-    ctx.fillStyle = color;
-    ctx.font = 'bold 64px sans-serif';
+    const font = 'bold 64px sans-serif';
+    ctx.font = font;
+    const pad = 40;
+    const tw = Math.ceil(ctx.measureText(text).width);
+    c.width = Math.max(128, tw + pad * 2);
+    c.height = 64 + pad;
+    ctx.font = font;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 64, 64);
-    return new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+    ctx.fillStyle = color;
+    ctx.fillText(text, c.width / 2, c.height / 2);
+    const spr = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }),
+    );
+    spr.scale.set(worldH * (c.width / c.height), worldH, 1);
+    return spr;
   };
   for (const { t, az, col } of [
     { t: 'N', az: 0, col: '#ff6666' },
@@ -143,14 +151,12 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     const spr = labelCanvas(t, col);
     const rad = (az * Math.PI) / 180;
     spr.position.set(Math.sin(rad) * 17, 0.5, Math.cos(rad) * 17);
-    spr.scale.set(2.2, 2.2, 1);
     scene.add(spr);
   }
 
   // Zenith marker
-  const zenithSpr = labelCanvas('ZENITH', '#44ff88');
+  const zenithSpr = labelCanvas('ZENITH', '#44ff88', 3);
   zenithSpr.position.set(0, 22, 0);
-  zenithSpr.scale.set(3, 3, 1);
   scene.add(zenithSpr);
   scene.add(
     new THREE.Line(
@@ -222,9 +228,8 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   scene.add(analemmaLine);
 
   // Path legend sprites
-  const legend = labelCanvas('today', '#ffdd55');
+  const legend = labelCanvas('today', '#ffdd55', 2.5);
   legend.position.set(-14, 1.2, -14);
-  legend.scale.set(2.5, 2.5, 1);
   scene.add(legend);
 
   function enuToThree(e: number, n: number, u: number, dist: number): THREE.Vector3 {
