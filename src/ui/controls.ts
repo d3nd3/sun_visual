@@ -102,21 +102,22 @@ export function createControls(root: HTMLElement): () => void {
             Season sun paths
             <span class="tip-mark" tabindex="0" aria-label="What are season sun paths?">?</span>
             <span class="tip-bubble" role="tooltip">
-              Three arcs for the same place: summer’s high path, winter’s low path,
-              and the middle path at equinox. Compare them to see how the sun’s daily
-              track rises and falls with the seasons.
+              In the Surface sky: three colored arcs for the same place — June’s high
+              path, December’s low path, and the middle path at equinox — so you can
+              compare how the sun’s daily track changes with the seasons.
             </span>
           </span>
         </label>
         <label class="check tip">
           <input type="checkbox" id="analemma" />
           <span>
-            Analemma
+            Analemma (purple figure‑8)
             <span class="tip-mark" tabindex="0" aria-label="What is an analemma?">?</span>
             <span class="tip-bubble" role="tooltip">
-              The figure-8 you’d get if you photographed the sun at the same clock
-              time every day for a year. Earth’s tilt and slightly oval orbit make
-              that loop.
+              Looks at the Surface sky. Set the clock near noon, then tick this.
+              A purple figure‑8 appears: where the sun sits at that same clock time
+              on every day of the year. Turn off “Lock camera to sun” and look around
+              to see the whole loop.
             </span>
           </span>
         </label>
@@ -250,7 +251,11 @@ export function createControls(root: HTMLElement): () => void {
     });
   });
 
-  analemma.addEventListener('change', () => setShowAnalemma(analemma.checked));
+  analemma.addEventListener('change', () => {
+    setShowAnalemma(analemma.checked);
+    // Unlock sun-cam so the full figure-8 is visible in the sky view
+    if (analemma.checked) setTrackSun(false);
+  });
   seasonPaths.addEventListener('change', () => setShowSeasonPaths(seasonPaths.checked));
   trackSun.addEventListener('change', () => setTrackSun(trackSun.checked));
   $('now-btn').addEventListener('click', () => setDatetime(new Date()));

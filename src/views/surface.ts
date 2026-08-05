@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { seasonDates, solarPosition, sunENU } from '../astro/sun';
+import { fromLocalParts, seasonDates, solarPosition, sunENU, toLocalParts } from '../astro/sun';
 import { state, subscribe } from '../state';
 
 export interface SurfaceView {
@@ -250,20 +250,37 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     ),
   };
   seasonGroup.add(seasonLines.jun, seasonLines.equ, seasonLines.dec);
+  const seasonLabels = {
+    jun: labelCanvas('June (high sun)', '#ff6644', 2.2),
+    equ: labelCanvas('Equinox', '#66ccff', 2.2),
+    dec: labelCanvas('December (low sun)', '#8888ff', 2.2),
+  };
+  seasonGroup.add(seasonLabels.jun, seasonLabels.equ, seasonLabels.dec);
 
   const analemmaLine = new THREE.Line(
     new THREE.BufferGeometry(),
-    new THREE.LineBasicMaterial({ color: 0xaa88ff, transparent: true, opacity: 0.85 }),
+    new THREE.LineBasicMaterial({ color: 0xdd99ff, transparent: true, opacity: 0.95 }),
   );
   scene.add(analemmaLine);
+  const analemmaBeads = new THREE.Group();
+  scene.add(analemmaBeads);
+  let analemmaLabel = labelCanvas('analemma', '#dd99ff', 2.4);
+  analemmaLabel.visible = false;
+  scene.add(analemmaLabel);
 
-  // Path legend sprites
-  const legend = labelCanvas('today', '#ffdd55', 2.5);
+  const legend = labelCanvas('today’s path', '#ffdd55', 2.5);
   legend.position.set(-14, 1.2, -14);
   scene.add(legend);
 
   function enuToThree(e: number, n: number, u: number, dist: number): THREE.Vector3 {
     return new THREE.Vector3(e, u, n).multiplyScalar(dist);
+  }
+
+  function peakOf(pts: THREE.Vector3[]): THREE.Vector3 | null {
+    if (!pts.length) return null;
+    let best = pts[0];
+    for (const p of pts) if (p.y > best.y) best = p;
+    return best.clone();
   }
 
   function sampleDayPath(lat: number, lon: number, day: Date, steps = 72): THREE.Vector3[] {
@@ -282,7 +299,6 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     todayPath.geometry.dispose();
     todayPath.geometry = new THREE.BufferGeometry().setFromPoints(today);
 
-    // Hour beads on today's path
     while (hourBeads.children.length) {
       const c = hourBeads.children.pop()!;
       (c as THREE.Mesh).geometry?.dispose();
@@ -307,32 +323,66 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     if (state.showSeasonPaths) {
       const y = state.datetime.getUTCFullYear();
       const seasons = seasonDates(y);
-      const setSeason = (line: THREE.Line, day: Date) => {
+      const setSeason = (line: THREE.Line, spr: THREE.Sprite, day: Date) => {
+        const pts = sampleDayPath(state.lat, state.lon, day);
         line.geometry.dispose();
-        line.geometry = new THREE.BufferGeometry().setFromPoints(
-          sampleDayPath(state.lat, state.lon, day),
-        );
+        line.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+        const peak = peakOf(pts);
+        spr.visible = !!peak;
+        if (peak) spr.position.copy(peak).multiplyScalar(1.06);
       };
-      setSeason(seasonLines.jun, seasons.junSolstice);
-      setSeason(seasonLines.equ, seasons.marEquinox);
-      setSeason(seasonLines.dec, seasons.decSolstice);
+      setSeason(seasonLines.jun, seasonLabels.jun, seasons.junSolstice);
+      setSeason(seasonLines.equ, seasonLabels.equ, seasons.marEquinox);
+      setSeason(seasonLines.dec, seasonLabels.dec, seasons.decSolstice);
     }
 
+    while (analemmaBeads.children.length) {
+      const c = analemmaBeads.children.pop()!;
+      (c as THREE.Mesh).geometry?.dispose();
+      analemmaBeads.remove(c);
+    }
     if (!state.showAnalemma) {
       analemmaLine.visible = false;
+      analemmaLabel.visible = false;
+      analemmaBeads.visible = false;
     } else {
-      analemmaLine.visible = true;
+      // Same local clock time each day → purple figure-8 in the sky
+      const loc = toLocalParts(state.datetime, state.lat, state.lon);
       const pts: THREE.Vector3[] = [];
-      const year = state.datetime.getUTCFullYear();
-      const h = state.datetime.getUTCHours();
-      const m = state.datetime.getUTCMinutes();
       for (let day = 0; day < 365; day += 2) {
-        const d = new Date(Date.UTC(year, 0, 1 + day, h, m));
+        const d = fromLocalParts(state.lat, state.lon, loc.y, 1, 1 + day, loc.h, loc.m);
         const [e, n, u] = sunENU(state.lat, state.lon, d);
-        pts.push(enuToThree(e, n, u, PATH_R - 2));
+        pts.push(enuToThree(e, n, u, PATH_R - 1));
       }
       analemmaLine.geometry.dispose();
       analemmaLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+      analemmaLine.visible = pts.length > 2;
+      analemmaBeads.visible = true;
+      for (let month = 0; month < 12; month++) {
+        const d = fromLocalParts(state.lat, state.lon, loc.y, month + 1, 1, loc.h, loc.m);
+        const [e, n, u] = sunENU(state.lat, state.lon, d);
+        if (u < -0.05) continue;
+        const bead = new THREE.Mesh(
+          new THREE.SphereGeometry(0.55, 10, 10),
+          new THREE.MeshBasicMaterial({ color: 0xeeaaff }),
+        );
+        bead.position.copy(enuToThree(e, n, u, PATH_R - 1));
+        analemmaBeads.add(bead);
+      }
+      // Label near the highest above-horizon point
+      const skyPts = pts.filter((p) => p.y > 0);
+      const peak = peakOf(skyPts.length ? skyPts : pts);
+      const clock = `${String(loc.h).padStart(2, '0')}:${String(loc.m).padStart(2, '0')}`;
+      if (analemmaLabel.userData.clock !== clock) {
+        scene.remove(analemmaLabel);
+        (analemmaLabel.material as THREE.SpriteMaterial).map?.dispose();
+        (analemmaLabel.material as THREE.Material).dispose();
+        analemmaLabel = labelCanvas(`analemma @ ${clock}`, '#dd99ff', 2.4);
+        analemmaLabel.userData.clock = clock;
+        scene.add(analemmaLabel);
+      }
+      analemmaLabel.visible = !!peak;
+      if (peak) analemmaLabel.position.copy(peak).multiplyScalar(1.08);
     }
   }
 
@@ -436,10 +486,13 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     traveledPath.geometry.dispose();
     traveledPath.geometry = new THREE.BufferGeometry().setFromPoints(traveled);
 
-    const pathKey = `${state.lat.toFixed(3)},${state.lon.toFixed(3)},${state.datetime.toISOString().slice(0, 10)},${state.showSeasonPaths},${state.showAnalemma}`;
+    const loc = toLocalParts(state.datetime, state.lat, state.lon);
+    const pathKey = `${state.lat.toFixed(3)},${state.lon.toFixed(3)},${loc.y}-${loc.mo}-${loc.day},${loc.h}:${loc.m},${state.showSeasonPaths},${state.showAnalemma}`;
     if (pathKey !== lastPathKey) {
+      const turningAnalemmaOn = state.showAnalemma && !lastPathKey.endsWith(',true');
       lastPathKey = pathKey;
       rebuildPaths();
+      if (turningAnalemmaOn) aimOverview();
     }
 
     const aimKey = `${state.lat.toFixed(4)},${state.lon.toFixed(4)},${state.lookNonce}`;
