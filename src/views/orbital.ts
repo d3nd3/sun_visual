@@ -13,7 +13,8 @@ import { setLocation, state, subscribe } from '../state';
 
 const R = 1;
 const UP_LEN = 2.8;
-const SUN_LEN = 4.8;
+const SUN_DIST = 48; // far enough that parallel sun-rays hit the sun mesh (no parallax)
+const SUN_LEN = SUN_DIST - 1.5;
 const AXIS_LEN = 1.85;
 const ARC_R = 2.2;
 const ε = (OBLIQUITY * Math.PI) / 180;
@@ -260,11 +261,11 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   const sunGroup = new THREE.Group();
   sunGroup.add(
     new THREE.Mesh(
-      new THREE.SphereGeometry(0.14, 24, 24),
+      new THREE.SphereGeometry(1.15, 24, 24),
       new THREE.MeshBasicMaterial({ color: 0xffee88 }),
     ),
     new THREE.Mesh(
-      new THREE.SphereGeometry(0.28, 24, 24),
+      new THREE.SphereGeometry(2.3, 24, 24),
       new THREE.MeshBasicMaterial({
         color: 0xffaa33,
         transparent: true,
@@ -415,7 +416,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     const sunWorld = new THREE.Vector3(sx, sy, sz);
     earthMat.uniforms.sunDir.value.copy(sunWorld);
     (atmo.material as THREE.ShaderMaterial).uniforms.sunDir.value.copy(sunWorld);
-    sunGroup.position.copy(sunWorld.clone().multiplyScalar(6));
+    sunGroup.position.copy(sunWorld.clone().multiplyScalar(SUN_DIST));
 
     // Spin Earth so geographic sun-direction maps onto the ecliptic sun
     // (tilt is Rx(ε); solve Ry(φ) so Rx(ε)·Ry(φ)·sunLocal = sunWorld)
