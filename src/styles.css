@@ -121,6 +121,15 @@ body {
 .swatch.ecliptic {
   background: #f0b429;
 }
+.swatch.equator {
+  background: #aaccff;
+}
+.swatch.cancer {
+  background: #ff8844;
+}
+.swatch.capricorn {
+  background: #66bbff;
+}
 .swatch.path-today {
   background: #ffdd55;
 }

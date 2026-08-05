@@ -128,6 +128,13 @@ export function createControls(root: HTMLElement): () => void {
         <div><i class="swatch angle"></i> Zenith angle wedge</div>
         <div><i class="swatch axis"></i> Polar axis (spin)</div>
         <div><i class="swatch ecliptic"></i> Ecliptic (orbit plane)</div>
+        <div><i class="swatch equator"></i> Equator — sun overhead at equinox</div>
+        <div><i class="swatch cancer"></i> Tropic of Cancer — sun overhead at Jun solstice</div>
+        <div><i class="swatch capricorn"></i> Tropic of Capricorn — sun overhead at Dec solstice</div>
+        <p class="hint">
+          Between the tropics the noon sun can pass straight overhead — that’s where
+          peak sunlight (and heat) happens. Outside them the sun never reaches zenith.
+        </p>
         <div><i class="swatch path-today"></i> Today’s path</div>
         <div><i class="swatch path-jun"></i> Jun solstice path</div>
         <div><i class="swatch path-equ"></i> Equinox path</div>

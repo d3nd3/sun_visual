@@ -246,18 +246,40 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   tiltBadge.position.set(0.55, AXIS_LEN * 0.55, 0);
   earthSpin.add(tiltBadge);
 
-  const eqRing = new THREE.Mesh(
-    new THREE.RingGeometry(R * 1.04, R * 1.07, 64),
-    new THREE.MeshBasicMaterial({
-      color: 0x88aacc,
-      transparent: true,
-      opacity: 0.4,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  );
-  eqRing.rotation.x = Math.PI / 2;
-  earthSpin.add(eqRing);
+  function ecefToThree(v: [number, number, number]): THREE.Vector3 {
+    return new THREE.Vector3(v[0], v[2], -v[1]);
+  }
+
+  function threeToEcef(v: THREE.Vector3): [number, number, number] {
+    return [v.x, -v.z, v.y];
+  }
+
+  // Latitude parallels: sun can be overhead between the tropics (peak insolation)
+  function latParallel(
+    lat: number,
+    color: number,
+    opacity: number,
+    label: string,
+    labelColor: string,
+  ): void {
+    const pts: THREE.Vector3[] = [];
+    const rr = R * 1.012;
+    for (let i = 0; i <= 96; i++) {
+      pts.push(ecefToThree(latLonToECEF(lat, (i / 96) * 360 - 180)).multiplyScalar(rr));
+    }
+    earthSpin.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
+      ),
+    );
+    const spr = makeTextSprite(label, labelColor, 0.18);
+    spr.position.copy(ecefToThree(latLonToECEF(lat, 20)).multiplyScalar(R * 1.08));
+    earthSpin.add(spr);
+  }
+  latParallel(0, 0xaaccff, 0.85, 'Equator 0°', '#aaccff');
+  latParallel(OBLIQUITY, 0xff8844, 0.9, 'Tropic of Cancer', '#ff8844');
+  latParallel(-OBLIQUITY, 0x66bbff, 0.9, 'Tropic of Capricorn', '#66bbff');
 
   const sunGroup = new THREE.Group();
   sunGroup.add(
@@ -326,14 +348,6 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-
-  function ecefToThree(v: [number, number, number]): THREE.Vector3 {
-    return new THREE.Vector3(v[0], v[2], -v[1]);
-  }
-
-  function threeToEcef(v: THREE.Vector3): [number, number, number] {
-    return [v.x, -v.z, v.y];
-  }
 
   function updateMarker(): void {
     const pos = ecefToThree(latLonToECEF(state.lat, state.lon)).multiplyScalar(R);
