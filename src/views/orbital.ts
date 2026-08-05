@@ -55,7 +55,7 @@ function makeTextSprite(text: string, color: string, scale = 0.28): THREE.Sprite
 
 export function createOrbitalView(container: HTMLElement): OrbitalView {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a2440);
+  scene.background = new THREE.Color(0x5a5a62);
 
   // Ecliptic frame: XZ = solar plane, Y = ecliptic north
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
