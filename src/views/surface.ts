@@ -406,6 +406,7 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
 
   let lastPathKey = '';
   let lastAimKey = '';
+  let lastTrackLoc = '';
 
   function aimOverview(): void {
     // Face the meridian (south in NH / north in SH) with pitch to see the arc
@@ -513,11 +514,17 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
       if (turningAnalemmaOn) aimOverview();
     }
 
-    const aimKey = `${state.lat.toFixed(4)},${state.lon.toFixed(4)},${state.lookNonce}`;
+    const aimKey = String(state.lookNonce);
     if (state.trackSun && pos.elevation > -5) {
-      yaw = (pos.azimuth * Math.PI) / 180;
-      pitch = Math.max(-0.05, Math.min(Math.PI / 2 - 0.05, (pos.elevation * Math.PI) / 180));
-      updateCamera();
+      const locKey = `${state.lat.toFixed(4)},${state.lon.toFixed(4)}`;
+      const locChanged = lastTrackLoc !== '' && locKey !== lastTrackLoc;
+      lastTrackLoc = locKey;
+      // Keep view still when only location changes (e.g. latitude slider)
+      if (!locChanged) {
+        yaw = (pos.azimuth * Math.PI) / 180;
+        pitch = Math.max(-0.05, Math.min(Math.PI / 2 - 0.05, (pos.elevation * Math.PI) / 180));
+        updateCamera();
+      }
     } else if (aimKey !== lastAimKey) {
       lastAimKey = aimKey;
       if (pos.elevation > -5) {

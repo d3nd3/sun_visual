@@ -228,7 +228,6 @@ export function createControls(root: HTMLElement): () => void {
   latSlider.addEventListener('input', () => {
     if (syncing) return;
     setLocation(Number(latSlider.value), state.lon);
-    requestLookAtSun();
   });
 
   $('btn-sunrise').addEventListener('click', () => {
