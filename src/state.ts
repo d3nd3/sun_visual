@@ -6,6 +6,7 @@ export interface AppState {
   datetime: Date;
   playSpeed: PlaySpeed;
   showAnalemma: boolean;
+  showSeasonPaths: boolean;
   lookNonce: number;
 }
 
@@ -19,6 +20,7 @@ export const state: AppState = {
   datetime: new Date(),
   playSpeed: 0,
   showAnalemma: false,
+  showSeasonPaths: true,
   lookNonce: 0,
 };
 
@@ -49,6 +51,11 @@ export function setPlaySpeed(s: PlaySpeed): void {
 
 export function setShowAnalemma(v: boolean): void {
   state.showAnalemma = v;
+  notify();
+}
+
+export function setShowSeasonPaths(v: boolean): void {
+  state.showSeasonPaths = v;
   notify();
 }
 

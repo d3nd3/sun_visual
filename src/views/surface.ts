@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { solarPosition, sunENU } from '../astro/sun';
+import { seasonDates, solarPosition, sunENU } from '../astro/sun';
 import { state, subscribe } from '../state';
 
 export interface SurfaceView {
@@ -8,28 +8,27 @@ export interface SurfaceView {
   dispose: () => void;
 }
 
+const PATH_R = 52;
+
 export function createSurfaceView(container: HTMLElement): SurfaceView {
   const scene = new THREE.Scene();
-
-  const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 200);
-  camera.position.set(0, 0.05, 0);
+  const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 200);
+  camera.position.set(0, 0.12, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   container.appendChild(renderer.domElement);
-  renderer.domElement.style.touchAction = 'none';
-  renderer.domElement.style.width = '100%';
-  renderer.domElement.style.height = '100%';
-  renderer.domElement.style.display = 'block';
+  Object.assign(renderer.domElement.style, {
+    touchAction: 'none',
+    width: '100%',
+    height: '100%',
+    display: 'block',
+  });
 
-  // Local frame: X=east, Y=up, Z=-north (Three look convention) → use X=east Y=up Z=south for simple
-  // We'll place things in ENU: X=east, Y=up, Z=north, and point camera with lookAt
+  let yaw = Math.PI; // look south
+  let pitch = 0.55; // elevated to see full arc
 
-  let yaw = 180 * (Math.PI / 180); // look south-ish initially toward sun often
-  let pitch = 15 * (Math.PI / 180);
-
-  // Sky dome gradient via shader
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(80, 32, 16),
     new THREE.ShaderMaterial({
@@ -58,7 +57,6 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
           vec3 nightBot = vec3(0.02, 0.04, 0.08);
           vec3 dayCol = mix(bottomColor, topColor, max(h, 0.0));
           vec3 nightCol = mix(nightBot, nightTop, max(h, 0.0));
-          // twilight orange near horizon
           float twilight = (1.0 - smoothstep(0.0, 12.0, abs(sunEl))) * (1.0 - abs(h));
           vec3 col = mix(nightCol, dayCol, day);
           col = mix(col, vec3(1.0, 0.45, 0.15), twilight * 0.55);
@@ -69,17 +67,14 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   );
   scene.add(sky);
 
-  // Stars
   const starGeo = new THREE.BufferGeometry();
-  const nStars = 800;
-  const sp = new Float32Array(nStars * 3);
-  for (let i = 0; i < nStars; i++) {
+  const sp = new Float32Array(600 * 3);
+  for (let i = 0; i < 600; i++) {
     const θ = Math.random() * Math.PI * 2;
-    const φ = Math.acos(Math.random()); // upper hemisphere bias
-    const r = 70;
-    sp[i * 3] = r * Math.sin(φ) * Math.cos(θ);
-    sp[i * 3 + 1] = r * Math.cos(φ);
-    sp[i * 3 + 2] = r * Math.sin(φ) * Math.sin(θ);
+    const φ = Math.acos(Math.random());
+    sp[i * 3] = 70 * Math.sin(φ) * Math.cos(θ);
+    sp[i * 3 + 1] = 70 * Math.cos(φ);
+    sp[i * 3 + 2] = 70 * Math.sin(φ) * Math.sin(θ);
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
   const stars = new THREE.Points(
@@ -88,22 +83,44 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   );
   scene.add(stars);
 
-  // Ground disk
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(40, 48),
-    new THREE.MeshBasicMaterial({ color: 0x1a2a18, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ color: 0x152018, side: THREE.DoubleSide }),
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.01;
+  ground.position.y = -0.02;
   scene.add(ground);
 
-  // Horizon ring + compass labels
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(18, 18.15, 64),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.35 }),
+  // Elevation guide rings (30° / 60°)
+  for (const el of [30, 60]) {
+    const rad = (el * Math.PI) / 180;
+    const y = Math.sin(rad) * 16;
+    const r = Math.cos(rad) * 16;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(r - 0.06, r + 0.06, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = y;
+    scene.add(ring);
+  }
+
+  const horizon = new THREE.Mesh(
+    new THREE.RingGeometry(18, 18.2, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.4,
+    }),
   );
-  ring.rotation.x = -Math.PI / 2;
-  scene.add(ring);
+  horizon.rotation.x = -Math.PI / 2;
+  scene.add(horizon);
 
   const labelCanvas = (text: string, color: string) => {
     const c = document.createElement('canvas');
@@ -111,96 +128,186 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     c.height = 128;
     const ctx = c.getContext('2d')!;
     ctx.fillStyle = color;
-    ctx.font = 'bold 72px sans-serif';
+    ctx.font = 'bold 64px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, 64, 64);
-    const tex = new THREE.CanvasTexture(c);
-    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
-    return new THREE.Sprite(mat);
+    return new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
   };
-  const compass: { spr: THREE.Sprite; az: number }[] = [
-    { spr: labelCanvas('N', '#ff6666'), az: 0 },
-    { spr: labelCanvas('E', '#88aaff'), az: 90 },
-    { spr: labelCanvas('S', '#ffffff'), az: 180 },
-    { spr: labelCanvas('W', '#88aaff'), az: 270 },
-  ];
-  for (const { spr, az } of compass) {
+  for (const { t, az, col } of [
+    { t: 'N', az: 0, col: '#ff6666' },
+    { t: 'E', az: 90, col: '#88aaff' },
+    { t: 'S', az: 180, col: '#ffffff' },
+    { t: 'W', az: 270, col: '#88aaff' },
+  ]) {
+    const spr = labelCanvas(t, col);
     const rad = (az * Math.PI) / 180;
-    // az from N clockwise: east=sin, north=cos → X=east Z=north
-    spr.position.set(Math.sin(rad) * 17, 0.4, Math.cos(rad) * 17);
-    spr.scale.set(2, 2, 1);
+    spr.position.set(Math.sin(rad) * 17, 0.5, Math.cos(rad) * 17);
+    spr.scale.set(2.2, 2.2, 1);
     scene.add(spr);
   }
 
-  // Sun disk
+  // Zenith marker
+  const zenithSpr = labelCanvas('ZENITH', '#44ff88');
+  zenithSpr.position.set(0, 22, 0);
+  zenithSpr.scale.set(3, 3, 1);
+  scene.add(zenithSpr);
+  scene.add(
+    new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 20, 0)]),
+      new THREE.LineBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 0.5 }),
+    ),
+  );
+
   const sun = new THREE.Mesh(
-    new THREE.SphereGeometry(1.2, 24, 24),
+    new THREE.SphereGeometry(1.6, 24, 24),
     new THREE.MeshBasicMaterial({ color: 0xfff0a0 }),
   );
   scene.add(sun);
   const sunHalo = new THREE.Mesh(
-    new THREE.SphereGeometry(2.4, 24, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffaa40, transparent: true, opacity: 0.35, depthWrite: false }),
+    new THREE.SphereGeometry(3.2, 24, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xffaa40,
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+    }),
   );
   scene.add(sunHalo);
 
-  // Day sun path
-  const pathMat = new THREE.LineBasicMaterial({ color: 0xffcc66, transparent: true, opacity: 0.7 });
-  let pathLine = new THREE.Line(new THREE.BufferGeometry(), pathMat);
-  scene.add(pathLine);
+  // Ray from observer to sun
+  const sunBeam = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xffcc66, transparent: true, opacity: 0.85 }),
+  );
+  scene.add(sunBeam);
 
-  // Analemma
-  const analemmaMat = new THREE.LineBasicMaterial({ color: 0xaa88ff, transparent: true, opacity: 0.8 });
-  let analemmaLine = new THREE.Line(new THREE.BufferGeometry(), analemmaMat);
+  const todayPath = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xffdd55 }),
+  );
+  scene.add(todayPath);
+
+  const traveledPath = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xff8800 }),
+  );
+  scene.add(traveledPath);
+
+  const hourBeads = new THREE.Group();
+  scene.add(hourBeads);
+
+  const seasonGroup = new THREE.Group();
+  scene.add(seasonGroup);
+  const seasonLines = {
+    jun: new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0xff6644, transparent: true, opacity: 0.85 }),
+    ),
+    equ: new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.7 }),
+    ),
+    dec: new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0x8888ff, transparent: true, opacity: 0.85 }),
+    ),
+  };
+  seasonGroup.add(seasonLines.jun, seasonLines.equ, seasonLines.dec);
+
+  const analemmaLine = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xaa88ff, transparent: true, opacity: 0.85 }),
+  );
   scene.add(analemmaLine);
+
+  // Path legend sprites
+  const legend = labelCanvas('today', '#ffdd55');
+  legend.position.set(-14, 1.2, -14);
+  legend.scale.set(2.5, 2.5, 1);
+  scene.add(legend);
 
   function enuToThree(e: number, n: number, u: number, dist: number): THREE.Vector3 {
     return new THREE.Vector3(e, u, n).multiplyScalar(dist);
   }
 
-  function rebuildPath(): void {
+  function sampleDayPath(lat: number, lon: number, day: Date, steps = 72): THREE.Vector3[] {
     const pts: THREE.Vector3[] = [];
-    const base = new Date(state.datetime);
-    for (let i = 0; i <= 48; i++) {
-      const d = new Date(base);
-      d.setUTCHours(0, 0, 0, 0);
-      d.setUTCMinutes((i / 48) * 24 * 60);
-      const [e, n, u] = sunENU(state.lat, state.lon, d);
-      if (u > -0.15) pts.push(enuToThree(e, n, u, 50));
+    const base = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()));
+    for (let i = 0; i <= steps; i++) {
+      const d = new Date(base.getTime() + (i / steps) * 86400000);
+      const [e, n, u] = sunENU(lat, lon, d);
+      if (u > -0.02) pts.push(enuToThree(e, n, u, PATH_R));
     }
-    pathLine.geometry.dispose();
-    pathLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+    return pts;
   }
 
-  function rebuildAnalemma(): void {
+  function rebuildPaths(): void {
+    const today = sampleDayPath(state.lat, state.lon, state.datetime);
+    todayPath.geometry.dispose();
+    todayPath.geometry = new THREE.BufferGeometry().setFromPoints(today);
+
+    // Hour beads on today's path
+    while (hourBeads.children.length) {
+      const c = hourBeads.children.pop()!;
+      (c as THREE.Mesh).geometry?.dispose();
+      hourBeads.remove(c);
+    }
+    const base = new Date(
+      Date.UTC(state.datetime.getUTCFullYear(), state.datetime.getUTCMonth(), state.datetime.getUTCDate()),
+    );
+    for (let h = 0; h < 24; h += 2) {
+      const d = new Date(base.getTime() + h * 3600000);
+      const [e, n, u] = sunENU(state.lat, state.lon, d);
+      if (u < 0.02) continue;
+      const bead = new THREE.Mesh(
+        new THREE.SphereGeometry(0.45, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffee88 }),
+      );
+      bead.position.copy(enuToThree(e, n, u, PATH_R));
+      hourBeads.add(bead);
+    }
+
+    seasonGroup.visible = state.showSeasonPaths;
+    if (state.showSeasonPaths) {
+      const y = state.datetime.getUTCFullYear();
+      const seasons = seasonDates(y);
+      const setSeason = (line: THREE.Line, day: Date) => {
+        line.geometry.dispose();
+        line.geometry = new THREE.BufferGeometry().setFromPoints(
+          sampleDayPath(state.lat, state.lon, day),
+        );
+      };
+      setSeason(seasonLines.jun, seasons.junSolstice);
+      setSeason(seasonLines.equ, seasons.marEquinox);
+      setSeason(seasonLines.dec, seasons.decSolstice);
+    }
+
     if (!state.showAnalemma) {
       analemmaLine.visible = false;
-      return;
+    } else {
+      analemmaLine.visible = true;
+      const pts: THREE.Vector3[] = [];
+      const year = state.datetime.getUTCFullYear();
+      const h = state.datetime.getUTCHours();
+      const m = state.datetime.getUTCMinutes();
+      for (let day = 0; day < 365; day += 2) {
+        const d = new Date(Date.UTC(year, 0, 1 + day, h, m));
+        const [e, n, u] = sunENU(state.lat, state.lon, d);
+        pts.push(enuToThree(e, n, u, PATH_R - 2));
+      }
+      analemmaLine.geometry.dispose();
+      analemmaLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
     }
-    analemmaLine.visible = true;
-    const pts: THREE.Vector3[] = [];
-    const year = state.datetime.getUTCFullYear();
-    const h = state.datetime.getUTCHours();
-    const m = state.datetime.getUTCMinutes();
-    for (let day = 0; day < 365; day += 3) {
-      const d = new Date(Date.UTC(year, 0, 1 + day, h, m));
-      const [e, n, u] = sunENU(state.lat, state.lon, d);
-      pts.push(enuToThree(e, n, u, 48));
-    }
-    analemmaLine.geometry.dispose();
-    analemmaLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
   }
 
   let lastPathKey = '';
   let lastAimKey = '';
 
-  function aimAtSun(): void {
-    const { azimuth, elevation } = solarPosition(state.lat, state.lon, state.datetime);
-    if (elevation > -5) {
-      yaw = (azimuth * Math.PI) / 180;
-      pitch = Math.max(0.05, Math.min(1.2, (elevation * Math.PI) / 180));
-    }
+  function aimOverview(): void {
+    // Face the meridian (south in NH / north in SH) with pitch to see the arc
+    yaw = state.lat >= 0 ? Math.PI : 0;
+    pitch = 0.55;
     updateCamera();
   }
 
@@ -208,43 +315,63 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     const pos = solarPosition(state.lat, state.lon, state.datetime);
     (sky.material as THREE.ShaderMaterial).uniforms.sunEl.value = pos.elevation;
     (stars.material as THREE.PointsMaterial).opacity =
-      pos.elevation < 0 ? 0.95 : Math.max(0, 0.4 - pos.elevation / 20);
+      pos.elevation < 0 ? 0.95 : Math.max(0, 0.35 - pos.elevation / 25);
 
     const [e, n, u] = sunENU(state.lat, state.lon, state.datetime);
-    const p = enuToThree(e, n, u, 55);
+    const p = enuToThree(e, n, u, PATH_R + 3);
     sun.position.copy(p);
     sunHalo.position.copy(p);
-    sun.visible = pos.elevation > -6;
-    sunHalo.visible = sun.visible;
+    const up = pos.elevation > -6;
+    sun.visible = up;
+    sunHalo.visible = up;
+    sunBeam.visible = up;
+    if (up) {
+      sunBeam.geometry.dispose();
+      sunBeam.geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0.1, 0),
+        p.clone(),
+      ]);
+    }
 
-    const day = state.datetime.toISOString().slice(0, 10);
-    const tod = `${state.datetime.getUTCHours()}:${state.datetime.getUTCMinutes()}`;
-    const locDay = `${state.lat.toFixed(3)},${state.lon.toFixed(3)},${day}`;
-    const fullKey = `${locDay},${tod},${state.showAnalemma}`;
-    if (fullKey !== lastPathKey) {
-      const prevLocDay = lastPathKey.split(',').slice(0, 3).join(',');
-      if (locDay !== prevLocDay) rebuildPath();
-      lastPathKey = fullKey;
-      rebuildAnalemma();
+    // Traveled portion of today's path (sunrise → now)
+    const traveled: THREE.Vector3[] = [];
+    const day0 = new Date(
+      Date.UTC(state.datetime.getUTCFullYear(), state.datetime.getUTCMonth(), state.datetime.getUTCDate()),
+    );
+    const nowMs = state.datetime.getTime();
+    for (let i = 0; i <= 48; i++) {
+      const d = new Date(day0.getTime() + (i / 48) * 86400000);
+      if (d.getTime() > nowMs) break;
+      const [ee, nn, uu] = sunENU(state.lat, state.lon, d);
+      if (uu > -0.02) traveled.push(enuToThree(ee, nn, uu, PATH_R));
+    }
+    traveledPath.geometry.dispose();
+    traveledPath.geometry = new THREE.BufferGeometry().setFromPoints(traveled);
+
+    const pathKey = `${state.lat.toFixed(3)},${state.lon.toFixed(3)},${state.datetime.toISOString().slice(0, 10)},${state.showSeasonPaths},${state.showAnalemma}`;
+    if (pathKey !== lastPathKey) {
+      lastPathKey = pathKey;
+      rebuildPaths();
     }
 
     const aimKey = `${state.lat.toFixed(4)},${state.lon.toFixed(4)},${state.lookNonce}`;
     if (aimKey !== lastAimKey) {
       lastAimKey = aimKey;
-      aimAtSun();
+      if (pos.elevation > -5) {
+        yaw = (pos.azimuth * Math.PI) / 180;
+        pitch = Math.max(0.35, Math.min(1.0, (pos.elevation * Math.PI) / 180 * 0.7 + 0.35));
+      } else {
+        aimOverview();
+      }
+      updateCamera();
     }
   }
 
   function updateCamera(): void {
     const cp = Math.cos(pitch);
-    const look = new THREE.Vector3(
-      Math.sin(yaw) * cp,
-      Math.sin(pitch),
-      Math.cos(yaw) * cp,
-    );
-    camera.position.set(0, 0.08, 0);
+    camera.position.set(0, 0.12, 0);
     camera.up.set(0, 1, 0);
-    camera.lookAt(look);
+    camera.lookAt(Math.sin(yaw) * cp, Math.sin(pitch), Math.cos(yaw) * cp);
   }
 
   let dragging = false;
@@ -258,12 +385,10 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   };
   const onMove = (e: PointerEvent) => {
     if (!dragging) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
+    yaw -= (e.clientX - lastX) * 0.005;
+    pitch = Math.max(-0.05, Math.min(Math.PI / 2 - 0.05, pitch - (e.clientY - lastY) * 0.005));
     lastX = e.clientX;
     lastY = e.clientY;
-    yaw -= dx * 0.005;
-    pitch = Math.max(-0.1, Math.min(Math.PI / 2 - 0.05, pitch - dy * 0.005));
     updateCamera();
   };
   const onUp = () => {
@@ -274,8 +399,9 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
   renderer.domElement.addEventListener('pointerup', onUp);
 
   const unsub = subscribe(updateSun);
+  rebuildPaths();
   updateSun();
-  aimAtSun();
+  aimOverview();
 
   return {
     render() {

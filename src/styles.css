@@ -73,6 +73,61 @@ body {
   display: none;
 }
 
+.purpose {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.purpose strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.hero-readout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #1a1420, #0c1830);
+  border: 1px solid #3a2a20;
+  border-radius: 10px;
+}
+
+.hero-readout span {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.2rem;
+}
+
+.hero-readout strong {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.swatch.angle {
+  background: #ff6644;
+}
+.swatch.path-today {
+  background: #ffdd55;
+}
+.swatch.path-jun {
+  background: #ff6644;
+}
+.swatch.path-equ {
+  background: #66ccff;
+}
+.swatch.path-dec {
+  background: #8888ff;
+}
+
 section {
   margin-bottom: 1rem;
 }

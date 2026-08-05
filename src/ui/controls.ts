@@ -12,15 +12,24 @@ import {
   toLocalParts,
 } from '../astro/sun';
 import {
+  requestLookAtSun,
   setDatetime,
   setLocation,
   setPlaySpeed,
   setShowAnalemma,
-  requestLookAtSun,
+  setShowSeasonPaths,
   state,
   subscribe,
 } from '../state';
 import type { PlaySpeed } from '../state';
+
+const LAT_PRESETS: { label: string; lat: number }[] = [
+  { label: 'Equator', lat: 0 },
+  { label: 'Tropic 23°', lat: 23.4 },
+  { label: '40°N', lat: 40 },
+  { label: 'London 51°', lat: 51.5 },
+  { label: 'Arctic 66°', lat: 66.5 },
+];
 
 export function createControls(root: HTMLElement): () => void {
   root.innerHTML = `
@@ -29,13 +38,30 @@ export function createControls(root: HTMLElement): () => void {
       <button type="button" class="collapse-btn" id="toggle-panel" aria-label="Toggle controls">▾</button>
     </div>
     <div class="panel-body" id="panel-body">
+      <p class="purpose">
+        Watch the <strong>sun’s path across your sky</strong>, and how the
+        <strong>up↔sun angle</strong> on the globe opens and closes as Earth turns.
+      </p>
+
+      <section class="hero-readout">
+        <div>
+          <span>Zenith angle (up↔sun)</span>
+          <strong id="r-zen">—</strong>
+        </div>
+        <div>
+          <span>Elevation (sky)</span>
+          <strong id="r-el">—</strong>
+        </div>
+      </section>
+
       <section>
         <label>Location <span id="latlon" class="mono"></span></label>
         <div class="row">
           <button type="button" id="geo-btn">Use my location</button>
           <button type="button" id="now-btn">Now</button>
         </div>
-        <p class="hint">Tap the globe to set your location. Time uses local solar time at that longitude.</p>
+        <div class="row seasons" id="lat-presets"></div>
+        <p class="hint">Tap the globe, or jump latitude — sun arcs reshape with lat.</p>
       </section>
 
       <section>
@@ -60,7 +86,7 @@ export function createControls(root: HTMLElement): () => void {
       </section>
 
       <section>
-        <label>Play speed</label>
+        <label>Play (watch angle &amp; path move)</label>
         <div class="row speeds" id="speeds">
           <button type="button" data-speed="0">Pause</button>
           <button type="button" data-speed="3600">1 h/s</button>
@@ -71,44 +97,59 @@ export function createControls(root: HTMLElement): () => void {
       </section>
 
       <section class="readouts">
-        <div><span>Elevation</span><strong id="r-el">—</strong></div>
         <div><span>Azimuth</span><strong id="r-az">—</strong></div>
-        <div><span>Zenith angle</span><strong id="r-zen">—</strong></div>
         <div><span>Day length</span><strong id="r-day">—</strong></div>
         <div><span>Sunrise</span><strong id="r-rise">—</strong></div>
         <div><span>Sunset</span><strong id="r-set">—</strong></div>
-        <div><span>Shadow (unit stick)</span><strong id="r-shadow">—</strong></div>
+        <div><span>Shadow</span><strong id="r-shadow">—</strong></div>
         <div><span>Declination</span><strong id="r-decl">—</strong></div>
       </section>
 
       <section>
         <label class="check">
-          <input type="checkbox" id="analemma" /> Show analemma (same clock time over year)
+          <input type="checkbox" id="season-paths" checked />
+          Season sun paths (Jun / equinox / Dec) — compare arcs
+        </label>
+        <label class="check">
+          <input type="checkbox" id="analemma" />
+          Analemma (same clock time over a year)
         </label>
       </section>
 
       <section class="legend">
         <div><i class="swatch up"></i> Up (zenith)</div>
         <div><i class="swatch sun"></i> Toward sun</div>
-        <div><i class="swatch east"></i> East</div>
-        <div><i class="swatch north"></i> North</div>
-        <div><i class="swatch sub"></i> Subsolar point</div>
+        <div><i class="swatch angle"></i> Zenith angle wedge</div>
+        <div><i class="swatch path-today"></i> Today’s path</div>
+        <div><i class="swatch path-jun"></i> Jun solstice path</div>
+        <div><i class="swatch path-equ"></i> Equinox path</div>
+        <div><i class="swatch path-dec"></i> Dec solstice path</div>
       </section>
     </div>
   `;
+
+  const presets = root.querySelector('#lat-presets')!;
+  for (const p of LAT_PRESETS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = p.label;
+    b.addEventListener('click', () => {
+      setLocation(p.lat, state.lon);
+      requestLookAtSun();
+    });
+    presets.appendChild(b);
+  }
 
   const $ = <T extends HTMLElement>(id: string) => root.querySelector('#' + id) as T;
   const dateInput = $<HTMLInputElement>('date-input');
   const timeSlider = $<HTMLInputElement>('time-slider');
   const analemma = $<HTMLInputElement>('analemma');
+  const seasonPaths = $<HTMLInputElement>('season-paths');
   const panelBody = $('panel-body');
   const toggleBtn = $('toggle-panel');
 
   let syncing = false;
-
-  function pad(n: number) {
-    return String(n).padStart(2, '0');
-  }
+  const pad = (n: number) => String(n).padStart(2, '0');
 
   function refresh(): void {
     syncing = true;
@@ -136,6 +177,7 @@ export function createControls(root: HTMLElement): () => void {
       b.classList.toggle('active', Number(b.dataset.speed) === state.playSpeed);
     });
     analemma.checked = state.showAnalemma;
+    seasonPaths.checked = state.showSeasonPaths;
     syncing = false;
   }
 
@@ -185,7 +227,7 @@ export function createControls(root: HTMLElement): () => void {
   });
 
   analemma.addEventListener('change', () => setShowAnalemma(analemma.checked));
-
+  seasonPaths.addEventListener('change', () => setShowSeasonPaths(seasonPaths.checked));
   $('now-btn').addEventListener('click', () => setDatetime(new Date()));
 
   $('geo-btn').addEventListener('click', () => {
@@ -194,6 +236,7 @@ export function createControls(root: HTMLElement): () => void {
       (pos) => {
         setLocation(pos.coords.latitude, pos.coords.longitude);
         setDatetime(new Date());
+        requestLookAtSun();
       },
       () => alert('Could not get location'),
       { enableHighAccuracy: true, timeout: 10000 },
