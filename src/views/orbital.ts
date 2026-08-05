@@ -380,8 +380,6 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     new THREE.MeshBasicMaterial({ color: 0xffee55 }),
   );
   earthSpin.add(subsolar);
-  const subsolarLabel = makeTextSprite('subsolar (sun overhead)', '#ffee55', 0.18);
-  earthSpin.add(subsolarLabel);
 
   // Fixed geometry: sun → subsolar point (where sun is straight up)
   const sunToSubsolar = new THREE.Line(
@@ -500,7 +498,6 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     );
 
     subsolar.position.copy(sunLocal.clone().multiplyScalar(R * 1.02));
-    subsolarLabel.position.copy(sunLocal.clone().multiplyScalar(R * 1.14));
 
     earthSpin.updateWorldMatrix(true, false);
     subsolar.getWorldPosition(_subWorld);
