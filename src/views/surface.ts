@@ -192,6 +192,15 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     scene.add(upArcLabel);
   }
 
+  // Celestial equator: always meets horizon at due E & W. Equinox sun rides this arc.
+  const celestialEq = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }),
+  );
+  scene.add(celestialEq);
+  const celestialEqLabel = labelCanvas('celestial equator → E & W', '#ffffff', 2.1);
+  scene.add(celestialEqLabel);
+
   const ARC_R = 18;
   const zenithArc = new THREE.Line(
     new THREE.BufferGeometry(),
@@ -312,10 +321,32 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     return pts;
   }
 
+  function sampleCelestialEquator(lat: number, steps = 72): THREE.Vector3[] {
+    // ENU: East×NCP spans the celestial equator with East; always hits due E & W
+    const φ = (lat * Math.PI) / 180;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * Math.PI; // 0=east … π=west (above-horizon half)
+      const e = Math.cos(t);
+      const n = -Math.sin(t) * Math.sin(φ);
+      const u = Math.sin(t) * Math.cos(φ);
+      if (u < -0.02) continue;
+      pts.push(enuToThree(e, n, u, PATH_R));
+    }
+    return pts;
+  }
+
   function rebuildPaths(): void {
     const today = sampleDayPath(state.lat, state.lon, state.datetime);
     todayPath.geometry.dispose();
     todayPath.geometry = new THREE.BufferGeometry().setFromPoints(today);
+
+    const eqPts = sampleCelestialEquator(state.lat);
+    celestialEq.geometry.dispose();
+    celestialEq.geometry = new THREE.BufferGeometry().setFromPoints(eqPts);
+    const eqPeak = peakOf(eqPts);
+    celestialEqLabel.visible = !!eqPeak;
+    if (eqPeak) celestialEqLabel.position.copy(eqPeak).multiplyScalar(1.05);
 
     while (hourBeads.children.length) {
       const c = hourBeads.children.pop()!;

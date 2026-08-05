@@ -141,6 +141,11 @@ export function createControls(root: HTMLElement): () => void {
         <div><i class="swatch path-today"></i> Today’s path</div>
         <div><i class="swatch path-jun"></i> Jun solstice path</div>
         <div><i class="swatch path-equ"></i> Equinox path</div>
+        <div><i class="swatch celestial-eq"></i> Celestial equator — always meets horizon at due E &amp; W</div>
+        <p class="hint">
+          On an equinox the sun’s path lies on the celestial equator, so sunrise is
+          due east and sunset due west at every latitude.
+        </p>
         <div><i class="swatch path-dec"></i> Dec solstice path</div>
       </section>
     </div>

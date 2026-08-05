@@ -139,6 +139,9 @@ body {
 .swatch.path-equ {
   background: #66ccff;
 }
+.swatch.celestial-eq {
+  background: #ffffff;
+}
 .swatch.path-dec {
   background: #8888ff;
 }
