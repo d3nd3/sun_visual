@@ -127,7 +127,8 @@ export function createControls(root: HTMLElement): () => void {
 
       <section class="legend">
         <div><i class="swatch up"></i> Up (zenith) + up arc (east→west through zenith)</div>
-        <div><i class="swatch sun"></i> Toward sun</div>
+        <div><i class="swatch sun"></i> Toward sun (from your pin)</div>
+        <div><i class="swatch sub"></i> Sun → subsolar (sun straight overhead there)</div>
         <div><i class="swatch angle"></i> Zenith angle wedge</div>
         <div><i class="swatch axis"></i> Polar axis (spin)</div>
         <div><i class="swatch ecliptic"></i> Ecliptic (orbit plane)</div>

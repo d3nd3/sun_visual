@@ -348,6 +348,16 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     new THREE.MeshBasicMaterial({ color: 0xffee55 }),
   );
   earthSpin.add(subsolar);
+  const subsolarLabel = makeTextSprite('subsolar (sun overhead)', '#ffee55', 0.18);
+  earthSpin.add(subsolarLabel);
+
+  // Fixed geometry: sun → subsolar point (where sun is straight up)
+  const sunToSubsolar = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({ color: 0xffee55, transparent: true, opacity: 0.9 }),
+  );
+  scene.add(sunToSubsolar);
+  const _subWorld = new THREE.Vector3();
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -458,6 +468,11 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     );
 
     subsolar.position.copy(sunLocal.clone().multiplyScalar(R * 1.02));
+    subsolarLabel.position.copy(sunLocal.clone().multiplyScalar(R * 1.14));
+
+    earthSpin.updateWorldMatrix(true, false);
+    subsolar.getWorldPosition(_subWorld);
+    sunToSubsolar.geometry.setFromPoints([sunGroup.position.clone(), _subWorld.clone()]);
   }
 
   function onPointer(e: PointerEvent): void {
