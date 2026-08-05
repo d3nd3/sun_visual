@@ -350,15 +350,13 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     setAxis(eastLine, eastT, 0.28);
     setAxis(northLine, northT, 0.28);
 
-    // Sun ray: geographic sun direction (= points at ecliptic sun after correct spin/tilt)
+    // Sun ray: only when sun is above horizon (else it would cut through Earth)
     const sunT = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
-    setAxis(sunRay, sunT, SUN_LEN);
-
-    // Zenith angle = angle between local up and sun direction
     const zenithRad = Math.acos(Math.min(1, Math.max(-1, upT.dot(sunT))));
-    const zenith = (zenithRad * 180) / Math.PI;
-    const elev = 90 - zenith;
-    // Keep readout consistent with astronomy module (should match)
+    const elev = 90 - (zenithRad * 180) / Math.PI;
+    sunRay.visible = elev > 0;
+    if (sunRay.visible) setAxis(sunRay, sunT, SUN_LEN);
+
     const zenithHud = solarPosition(state.lat, state.lon, state.datetime).zenith;
 
     const axis = new THREE.Vector3().crossVectors(upT, sunT);
