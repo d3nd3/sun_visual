@@ -442,7 +442,11 @@ export function createSurfaceView(container: HTMLElement): SurfaceView {
     }
 
     const aimKey = `${state.lat.toFixed(4)},${state.lon.toFixed(4)},${state.lookNonce}`;
-    if (aimKey !== lastAimKey) {
+    if (state.trackSun && pos.elevation > -5) {
+      yaw = (pos.azimuth * Math.PI) / 180;
+      pitch = Math.max(-0.05, Math.min(Math.PI / 2 - 0.05, (pos.elevation * Math.PI) / 180));
+      updateCamera();
+    } else if (aimKey !== lastAimKey) {
       lastAimKey = aimKey;
       if (pos.elevation > -5) {
         yaw = (pos.azimuth * Math.PI) / 180;

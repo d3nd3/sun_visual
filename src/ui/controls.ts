@@ -18,6 +18,7 @@ import {
   setPlaySpeed,
   setShowAnalemma,
   setShowSeasonPaths,
+  setTrackSun,
   state,
   subscribe,
 } from '../state';
@@ -107,6 +108,10 @@ export function createControls(root: HTMLElement): () => void {
 
       <section>
         <label class="check">
+          <input type="checkbox" id="track-sun" />
+          Surface: auto point camera at sun
+        </label>
+        <label class="check">
           <input type="checkbox" id="season-paths" checked />
           Season sun paths (Jun / equinox / Dec) — compare arcs
         </label>
@@ -147,6 +152,7 @@ export function createControls(root: HTMLElement): () => void {
   const timeSlider = $<HTMLInputElement>('time-slider');
   const analemma = $<HTMLInputElement>('analemma');
   const seasonPaths = $<HTMLInputElement>('season-paths');
+  const trackSun = $<HTMLInputElement>('track-sun');
   const panelBody = $('panel-body');
   const toggleBtn = $('toggle-panel');
 
@@ -184,6 +190,7 @@ export function createControls(root: HTMLElement): () => void {
     });
     analemma.checked = state.showAnalemma;
     seasonPaths.checked = state.showSeasonPaths;
+    trackSun.checked = state.trackSun;
     syncing = false;
   }
 
@@ -236,6 +243,7 @@ export function createControls(root: HTMLElement): () => void {
 
   analemma.addEventListener('change', () => setShowAnalemma(analemma.checked));
   seasonPaths.addEventListener('change', () => setShowSeasonPaths(seasonPaths.checked));
+  trackSun.addEventListener('change', () => setTrackSun(trackSun.checked));
   $('now-btn').addEventListener('click', () => setDatetime(new Date()));
 
   $('geo-btn').addEventListener('click', () => {
