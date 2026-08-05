@@ -377,6 +377,28 @@ button.active {
   margin: 0;
 }
 
+.view-corner-play {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  max-width: min(100% - 1rem, 22rem);
+  padding: 0.3rem;
+  background: #070b14cc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+}
+
+.view-corner-play button {
+  font-size: 0.72rem;
+  padding: 0.32rem 0.45rem;
+}
+
 .mobile-tabs {
   display: none;
 }

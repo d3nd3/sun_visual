@@ -86,17 +86,6 @@ export function createControls(root: HTMLElement): () => void {
         </div>
       </section>
 
-      <section>
-        <label>Play (watch angle &amp; path move)</label>
-        <div class="row speeds" id="speeds">
-          <button type="button" data-speed="0">Pause</button>
-          <button type="button" data-speed="3600">1 h/s</button>
-          <button type="button" data-speed="10800">3 h/s</button>
-          <button type="button" data-speed="86400">1 day/s</button>
-          <button type="button" data-speed="604800">1 week/s</button>
-        </div>
-      </section>
-
       <section class="readouts">
         <div><span>Azimuth</span><strong id="r-az">—</strong></div>
         <div><span>Day length</span><strong id="r-day">—</strong></div>
@@ -165,6 +154,7 @@ export function createControls(root: HTMLElement): () => void {
   const analemma = $<HTMLInputElement>('analemma');
   const seasonPaths = $<HTMLInputElement>('season-paths');
   const trackSun = document.querySelector('#track-sun') as HTMLInputElement;
+  const speeds = document.querySelector('#speeds') as HTMLElement;
   const panelBody = $('panel-body');
   const toggleBtn = $('toggle-panel');
 
@@ -197,7 +187,7 @@ export function createControls(root: HTMLElement): () => void {
     const sh = shadowLength(pos.elevation);
     $('r-shadow').textContent = sh == null ? '∞ / night' : `${sh.toFixed(2)}×`;
 
-    root.querySelectorAll<HTMLButtonElement>('#speeds button').forEach((b) => {
+    speeds.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
       b.classList.toggle('active', Number(b.dataset.speed) === state.playSpeed);
     });
     analemma.checked = state.showAnalemma;
@@ -239,7 +229,7 @@ export function createControls(root: HTMLElement): () => void {
     }
   });
 
-  root.querySelectorAll<HTMLButtonElement>('#speeds button').forEach((b) => {
+  speeds.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
     b.addEventListener('click', () => setPlaySpeed(Number(b.dataset.speed) as PlaySpeed));
   });
 
