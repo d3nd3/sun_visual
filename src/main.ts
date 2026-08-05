@@ -37,12 +37,12 @@ tabs.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
 let last = performance.now();
 let uiAcc = 0;
 function frame(now: number): void {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   if (state.playSpeed > 0) {
     state.datetime = new Date(state.datetime.getTime() + state.playSpeed * dt * 1000);
     uiAcc += dt;
-    if (uiAcc > 0.2) {
+    if (uiAcc >= 0.1) {
       uiAcc = 0;
       notify();
     }

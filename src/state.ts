@@ -1,4 +1,4 @@
-export type PlaySpeed = 0 | 1 | 10 | 60 | 86400;
+export type PlaySpeed = 0 | 3600 | 10800 | 86400 | 604800;
 
 export interface AppState {
   lat: number;

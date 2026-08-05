@@ -1,12 +1,15 @@
 import {
   formatDuration,
   formatLocal,
-  localCivilTime,
+  formatOffset,
+  fromLocalParts,
   seasonDates,
   setLocalCivilTime,
+  setLocalDate,
   shadowLength,
   solarPosition,
   sunTimes,
+  toLocalParts,
 } from '../astro/sun';
 import {
   setDatetime,
@@ -30,8 +33,9 @@ export function createControls(root: HTMLElement): () => void {
         <label>Location <span id="latlon" class="mono"></span></label>
         <div class="row">
           <button type="button" id="geo-btn">Use my location</button>
+          <button type="button" id="now-btn">Now</button>
         </div>
-        <p class="hint">Tap the globe to set your location.</p>
+        <p class="hint">Tap the globe to set your location. Time uses local solar time at that longitude.</p>
       </section>
 
       <section>
@@ -46,7 +50,7 @@ export function createControls(root: HTMLElement): () => void {
       </section>
 
       <section>
-        <label>Local time (lon/15) <span id="time-label" class="mono"></span></label>
+        <label>Local solar time <span id="tz-label" class="mono"></span> <span id="time-label" class="mono"></span></label>
         <input type="range" id="time-slider" min="0" max="1439" step="1" />
         <div class="row shortcuts">
           <button type="button" id="btn-sunrise">Sunrise</button>
@@ -59,10 +63,10 @@ export function createControls(root: HTMLElement): () => void {
         <label>Play speed</label>
         <div class="row speeds" id="speeds">
           <button type="button" data-speed="0">Pause</button>
-          <button type="button" data-speed="1">1×</button>
-          <button type="button" data-speed="10">10×</button>
-          <button type="button" data-speed="60">60×</button>
+          <button type="button" data-speed="3600">1 h/s</button>
+          <button type="button" data-speed="10800">3 h/s</button>
           <button type="button" data-speed="86400">1 day/s</button>
+          <button type="button" data-speed="604800">1 week/s</button>
         </div>
       </section>
 
@@ -109,10 +113,11 @@ export function createControls(root: HTMLElement): () => void {
   function refresh(): void {
     syncing = true;
     const d = state.datetime;
-    dateInput.value = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-    const { h, m } = localCivilTime(d, state.lon);
-    timeSlider.value = String(h * 60 + m);
-    $('time-label').textContent = `${pad(h)}:${pad(m)}`;
+    const loc = toLocalParts(d, state.lon);
+    dateInput.value = `${loc.y}-${pad(loc.mo)}-${pad(loc.day)}`;
+    timeSlider.value = String(loc.h * 60 + loc.m);
+    $('time-label').textContent = `${pad(loc.h)}:${pad(loc.m)}`;
+    $('tz-label').textContent = `(${formatOffset(state.lon)})`;
     $('latlon').textContent = `${state.lat.toFixed(2)}°, ${state.lon.toFixed(2)}°`;
 
     const pos = solarPosition(state.lat, state.lon, d);
@@ -137,9 +142,7 @@ export function createControls(root: HTMLElement): () => void {
   dateInput.addEventListener('change', () => {
     if (syncing) return;
     const [y, mo, day] = dateInput.value.split('-').map(Number);
-    const nd = new Date(state.datetime);
-    nd.setUTCFullYear(y, mo - 1, day);
-    setDatetime(nd);
+    setDatetime(setLocalDate(state.datetime, state.lon, y, mo, day));
   });
 
   timeSlider.addEventListener('input', () => {
@@ -174,19 +177,24 @@ export function createControls(root: HTMLElement): () => void {
   root.querySelectorAll<HTMLButtonElement>('[data-season]').forEach((b) => {
     b.addEventListener('click', () => {
       const key = b.dataset.season as keyof ReturnType<typeof seasonDates>;
-      const seasons = seasonDates(state.datetime.getUTCFullYear());
-      const { h, m } = localCivilTime(state.datetime, state.lon);
-      const nd = seasons[key];
-      setDatetime(setLocalCivilTime(nd, state.lon, h, m));
+      const p = toLocalParts(state.datetime, state.lon);
+      const seasons = seasonDates(p.y);
+      const sp = toLocalParts(seasons[key], state.lon);
+      setDatetime(fromLocalParts(state.lon, sp.y, sp.mo, sp.day, p.h, p.m));
     });
   });
 
   analemma.addEventListener('change', () => setShowAnalemma(analemma.checked));
 
+  $('now-btn').addEventListener('click', () => setDatetime(new Date()));
+
   $('geo-btn').addEventListener('click', () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (p) => setLocation(p.coords.latitude, p.coords.longitude),
+      (pos) => {
+        setLocation(pos.coords.latitude, pos.coords.longitude);
+        setDatetime(new Date());
+      },
       () => alert('Could not get location'),
       { enableHighAccuracy: true, timeout: 10000 },
     );

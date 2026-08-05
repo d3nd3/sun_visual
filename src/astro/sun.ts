@@ -206,33 +206,75 @@ export function formatDuration(hours: number): string {
   return `${h}h ${m}m`;
 }
 
-export function formatLocal(d: Date, lon: number): string {
-  // Approximate local mean solar-ish display: UTC + lon/15
-  const offsetMs = (lon / 15) * 3600000;
-  const local = new Date(d.getTime() + offsetMs);
-  const hh = String(local.getUTCHours()).padStart(2, '0');
-  const mm = String(local.getUTCMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
+/** Hours east of UTC from longitude (local mean solar time). */
+export function lonOffsetHours(lon: number): number {
+  return lon / 15;
 }
 
-export function localCivilTime(d: Date, lon: number): { h: number; m: number; s: number } {
-  const offsetMs = (lon / 15) * 3600000;
-  const local = new Date(d.getTime() + offsetMs);
+export function formatOffset(lon: number): string {
+  const h = lonOffsetHours(lon);
+  const sign = h >= 0 ? '+' : '−';
+  const abs = Math.abs(h);
+  const hh = Math.floor(abs);
+  const mm = Math.round((abs - hh) * 60);
+  return mm ? `UTC${sign}${hh}:${String(mm).padStart(2, '0')}` : `UTC${sign}${hh}`;
+}
+
+export interface LocalParts {
+  y: number;
+  mo: number; // 1-12
+  day: number;
+  h: number;
+  m: number;
+  s: number;
+}
+
+/** Split an instant into local mean-solar calendar parts at lon. */
+export function toLocalParts(date: Date, lon: number): LocalParts {
+  const local = new Date(date.getTime() + lonOffsetHours(lon) * 3600000);
   return {
+    y: local.getUTCFullYear(),
+    mo: local.getUTCMonth() + 1,
+    day: local.getUTCDate(),
     h: local.getUTCHours(),
     m: local.getUTCMinutes(),
     s: local.getUTCSeconds(),
   };
 }
 
+/** Build UTC instant from local mean-solar parts at lon. */
+export function fromLocalParts(
+  lon: number,
+  y: number,
+  mo: number,
+  day: number,
+  h: number,
+  m: number,
+  s = 0,
+): Date {
+  return new Date(Date.UTC(y, mo - 1, day, h, m, s) - lonOffsetHours(lon) * 3600000);
+}
+
+export function formatLocal(d: Date, lon: number): string {
+  const { h, m } = toLocalParts(d, lon);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+export function localCivilTime(d: Date, lon: number): { h: number; m: number; s: number } {
+  const p = toLocalParts(d, lon);
+  return { h: p.h, m: p.m, s: p.s };
+}
+
+/** Set local clock time, keeping the local calendar date. */
 export function setLocalCivilTime(base: Date, lon: number, h: number, m: number): Date {
-  const offsetMs = (lon / 15) * 3600000;
-  const y = base.getUTCFullYear();
-  const mo = base.getUTCMonth();
-  const day = base.getUTCDate();
-  // Construct UTC such that local = h:m
-  const utcMs = Date.UTC(y, mo, day, h, m) - offsetMs;
-  return new Date(utcMs);
+  const p = toLocalParts(base, lon);
+  return fromLocalParts(lon, p.y, p.mo, p.day, h, m);
+}
+
+/** Set local calendar date, keeping the local clock time. */
+export function setLocalDate(base: Date, lon: number, y: number, mo: number, day: number): Date {
+  const p = toLocalParts(base, lon);
+  return fromLocalParts(lon, y, mo, day, p.h, p.m, p.s);
 }
 
 /** Approximate equinox/solstice UTC dates for a year. */
