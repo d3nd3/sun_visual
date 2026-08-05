@@ -184,8 +184,8 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   });
 
   // Tip geographic north (local Y) toward +Z by obliquity (June lean).
-  // Parent yaw tracks −λ so the sun can stay fixed in world space while
-  // seasons look like Earth’s tilt leaning toward / away from that sun.
+  // Parent yaw = +λ so a fixed world sun at +X sees N pole tip toward it in June
+  // and away in December — season switches keep the sun/camera view stable.
   const earthSeason = new THREE.Group();
   scene.add(earthSeason);
   const earthTilt = new THREE.Group();
@@ -432,17 +432,17 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   }
 
   function updateSun(): void {
-    // Keep the sun fixed in world space (+X). Rotate Earth around ecliptic Y by −λ
-    // so seasons read as the axis tipping toward / away from the same sun.
+    // Keep the sun fixed in world space (+X). Rotate Earth around ecliptic Y by +λ
+    // so June tips the N pole toward the sun and December tips it away.
     const λ = (sunEclipticLongitude(state.datetime) * Math.PI) / 180;
-    earthSeason.rotation.y = -λ;
+    earthSeason.rotation.y = λ;
 
     const sunWorld = new THREE.Vector3(1, 0, 0);
     earthMat.uniforms.sunDir.value.copy(sunWorld);
     (atmo.material as THREE.ShaderMaterial).uniforms.sunDir.value.copy(sunWorld);
     sunGroup.position.set(SUN_DIST, 0, 0);
 
-    // In earthTilt space the sun still appears at ecliptic (cos λ, 0, sin λ)
+    // In earthTilt space the sun appears at ecliptic (cos λ, 0, sin λ)
     const sunEcl = new THREE.Vector3(Math.cos(λ), 0, Math.sin(λ));
     const sunLocal = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
     const target = sunEcl.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), -ε);
