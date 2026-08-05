@@ -107,13 +107,29 @@ export function createControls(root: HTMLElement): () => void {
       </section>
 
       <section>
-        <label class="check">
+        <label class="check tip">
           <input type="checkbox" id="season-paths" checked />
-          Season sun paths (Jun / equinox / Dec) — compare arcs
+          <span>
+            Season sun paths
+            <span class="tip-mark" tabindex="0" aria-label="What are season sun paths?">?</span>
+            <span class="tip-bubble" role="tooltip">
+              Three arcs for the same place: summer’s high path, winter’s low path,
+              and the middle path at equinox. Compare them to see how the sun’s daily
+              track rises and falls with the seasons.
+            </span>
+          </span>
         </label>
-        <label class="check">
+        <label class="check tip">
           <input type="checkbox" id="analemma" />
-          Analemma (same clock time over a year)
+          <span>
+            Analemma
+            <span class="tip-mark" tabindex="0" aria-label="What is an analemma?">?</span>
+            <span class="tip-bubble" role="tooltip">
+              The figure-8 you’d get if you photographed the sun at the same clock
+              time every day for a year. Earth’s tilt and slightly oval orbit make
+              that loop.
+            </span>
+          </span>
         </label>
       </section>
 

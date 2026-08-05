@@ -158,6 +158,53 @@ label.check {
   cursor: pointer;
 }
 
+label.check.tip {
+  position: relative;
+}
+
+.tip-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-left: 0.3rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--btn);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  vertical-align: 0.05em;
+  cursor: help;
+}
+
+.tip-bubble {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.4rem);
+  width: min(16.5rem, calc(100vw - 2.5rem));
+  padding: 0.65rem 0.75rem;
+  background: #121a2cee;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: 0 8px 24px #0008;
+  z-index: 5;
+  pointer-events: none;
+}
+
+label.check.tip:hover .tip-bubble,
+label.check.tip:focus-within .tip-bubble {
+  display: block;
+}
+
 .hint {
   margin: 0.35rem 0 0;
   font-size: 0.78rem;
