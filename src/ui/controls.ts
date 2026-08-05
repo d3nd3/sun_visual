@@ -69,10 +69,10 @@ export function createControls(root: HTMLElement): () => void {
         <label>Date</label>
         <input type="date" id="date-input" />
         <div class="row seasons">
-          <button type="button" data-season="marEquinox">Mar equinox</button>
-          <button type="button" data-season="junSolstice">Jun solstice</button>
-          <button type="button" data-season="sepEquinox">Sep equinox</button>
-          <button type="button" data-season="decSolstice">Dec solstice</button>
+          <button type="button" data-season="marEquinox">Mar equinox (spring)</button>
+          <button type="button" data-season="junSolstice">Jun solstice (summer)</button>
+          <button type="button" data-season="sepEquinox">Sep equinox (autumn)</button>
+          <button type="button" data-season="decSolstice">Dec solstice (winter)</button>
         </div>
       </section>
 

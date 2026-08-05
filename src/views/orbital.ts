@@ -7,7 +7,7 @@ import {
   OBLIQUITY,
   solarPosition,
   sunDirectionECEF,
-  sunDirectionEcliptic,
+  sunEclipticLongitude,
   sunTimes,
 } from '../astro/sun';
 import { setLocation, state, subscribe } from '../state';
@@ -183,11 +183,14 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     `,
   });
 
-  // Tip geographic north (local Y) toward +Z by obliquity (June sun is at +Z).
-  // Camera is locked to XZ = ecliptic, so this lean is always visible.
+  // Tip geographic north (local Y) toward +Z by obliquity (June lean).
+  // Parent yaw tracks −λ so the sun can stay fixed in world space while
+  // seasons look like Earth’s tilt leaning toward / away from that sun.
+  const earthSeason = new THREE.Group();
+  scene.add(earthSeason);
   const earthTilt = new THREE.Group();
   earthTilt.rotation.x = ε;
-  scene.add(earthTilt);
+  earthSeason.add(earthTilt);
 
   // Daily spin around the tipped polar axis
   const earthSpin = new THREE.Group();
@@ -429,17 +432,20 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   }
 
   function updateSun(): void {
-    // Sun always on the ecliptic (solar) plane — y = 0
-    const [sx, sy, sz] = sunDirectionEcliptic(state.datetime);
-    const sunWorld = new THREE.Vector3(sx, sy, sz);
+    // Keep the sun fixed in world space (+X). Rotate Earth around ecliptic Y by −λ
+    // so seasons read as the axis tipping toward / away from the same sun.
+    const λ = (sunEclipticLongitude(state.datetime) * Math.PI) / 180;
+    earthSeason.rotation.y = -λ;
+
+    const sunWorld = new THREE.Vector3(1, 0, 0);
     earthMat.uniforms.sunDir.value.copy(sunWorld);
     (atmo.material as THREE.ShaderMaterial).uniforms.sunDir.value.copy(sunWorld);
-    sunGroup.position.copy(sunWorld.clone().multiplyScalar(SUN_DIST));
+    sunGroup.position.set(SUN_DIST, 0, 0);
 
-    // Spin Earth so geographic sun-direction maps onto the ecliptic sun
-    // (tilt is Rx(ε); solve Ry(φ) so Rx(ε)·Ry(φ)·sunLocal = sunWorld)
+    // In earthTilt space the sun still appears at ecliptic (cos λ, 0, sin λ)
+    const sunEcl = new THREE.Vector3(Math.cos(λ), 0, Math.sin(λ));
     const sunLocal = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
-    const target = sunWorld.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), -ε);
+    const target = sunEcl.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), -ε);
     const from = new THREE.Vector3(sunLocal.x, 0, sunLocal.z).normalize();
     const to = new THREE.Vector3(target.x, 0, target.z).normalize();
     earthSpin.rotation.y = Math.atan2(
