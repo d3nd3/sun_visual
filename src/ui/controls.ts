@@ -61,7 +61,7 @@ export function createControls(root: HTMLElement): () => void {
           <button type="button" id="now-btn">Now</button>
         </div>
         <div class="row seasons" id="lat-presets"></div>
-        <p class="hint">Tap the globe, or jump latitude — sun arcs reshape with lat.</p>
+        <p class="hint">Tap the globe, or jump latitude — sun arcs reshape with lat. Clock uses the zone’s DST.</p>
       </section>
 
       <section>
@@ -76,7 +76,7 @@ export function createControls(root: HTMLElement): () => void {
       </section>
 
       <section>
-        <label>Local solar time <span id="tz-label" class="mono"></span> <span id="time-label" class="mono"></span></label>
+        <label>Local time <span id="tz-label" class="mono"></span> <span id="time-label" class="mono"></span></label>
         <input type="range" id="time-slider" min="0" max="1439" step="1" />
         <div class="row shortcuts">
           <button type="button" id="btn-sunrise">Sunrise</button>
@@ -154,11 +154,11 @@ export function createControls(root: HTMLElement): () => void {
   function refresh(): void {
     syncing = true;
     const d = state.datetime;
-    const loc = toLocalParts(d, state.lon);
+    const loc = toLocalParts(d, state.lat, state.lon);
     dateInput.value = `${loc.y}-${pad(loc.mo)}-${pad(loc.day)}`;
     timeSlider.value = String(loc.h * 60 + loc.m);
     $('time-label').textContent = `${pad(loc.h)}:${pad(loc.m)}`;
-    $('tz-label').textContent = `(${formatOffset(state.lon)})`;
+    $('tz-label').textContent = `(${formatOffset(d, state.lat, state.lon)})`;
     $('latlon').textContent = `${state.lat.toFixed(2)}°, ${state.lon.toFixed(2)}°`;
 
     const pos = solarPosition(state.lat, state.lon, d);
@@ -167,8 +167,12 @@ export function createControls(root: HTMLElement): () => void {
     $('r-az').textContent = `${pos.azimuth.toFixed(1)}°`;
     $('r-zen').textContent = `${pos.zenith.toFixed(1)}°`;
     $('r-day').textContent = formatDuration(times.dayLengthHours);
-    $('r-rise').textContent = times.sunrise ? formatLocal(times.sunrise, state.lon) : '—';
-    $('r-set').textContent = times.sunset ? formatLocal(times.sunset, state.lon) : '—';
+    $('r-rise').textContent = times.sunrise
+      ? formatLocal(times.sunrise, state.lat, state.lon)
+      : '—';
+    $('r-set').textContent = times.sunset
+      ? formatLocal(times.sunset, state.lat, state.lon)
+      : '—';
     $('r-decl').textContent = `${pos.declination.toFixed(2)}°`;
     const sh = shadowLength(pos.elevation);
     $('r-shadow').textContent = sh == null ? '∞ / night' : `${sh.toFixed(2)}×`;
@@ -184,13 +188,15 @@ export function createControls(root: HTMLElement): () => void {
   dateInput.addEventListener('change', () => {
     if (syncing) return;
     const [y, mo, day] = dateInput.value.split('-').map(Number);
-    setDatetime(setLocalDate(state.datetime, state.lon, y, mo, day));
+    setDatetime(setLocalDate(state.datetime, state.lat, state.lon, y, mo, day));
   });
 
   timeSlider.addEventListener('input', () => {
     if (syncing) return;
     const mins = Number(timeSlider.value);
-    setDatetime(setLocalCivilTime(state.datetime, state.lon, Math.floor(mins / 60), mins % 60));
+    setDatetime(
+      setLocalCivilTime(state.datetime, state.lat, state.lon, Math.floor(mins / 60), mins % 60),
+    );
   });
 
   $('btn-sunrise').addEventListener('click', () => {
@@ -219,10 +225,10 @@ export function createControls(root: HTMLElement): () => void {
   root.querySelectorAll<HTMLButtonElement>('[data-season]').forEach((b) => {
     b.addEventListener('click', () => {
       const key = b.dataset.season as keyof ReturnType<typeof seasonDates>;
-      const p = toLocalParts(state.datetime, state.lon);
+      const p = toLocalParts(state.datetime, state.lat, state.lon);
       const seasons = seasonDates(p.y);
-      const sp = toLocalParts(seasons[key], state.lon);
-      setDatetime(fromLocalParts(state.lon, sp.y, sp.mo, sp.day, p.h, p.m));
+      const sp = toLocalParts(seasons[key], state.lat, state.lon);
+      setDatetime(fromLocalParts(state.lat, state.lon, sp.y, sp.mo, sp.day, p.h, p.m));
     });
   });
 

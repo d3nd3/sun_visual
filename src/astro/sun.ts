@@ -1,5 +1,7 @@
 /** Solar / Earth astronomy helpers (NOAA-style approximations). */
 
+import tzlookup from 'tz-lookup';
+
 const DEG = Math.PI / 180;
 const RAD = 180 / Math.PI;
 export const OBLIQUITY = 23.43928;
@@ -206,18 +208,14 @@ export function formatDuration(hours: number): string {
   return `${h}h ${m}m`;
 }
 
-/** Hours east of UTC from longitude (local mean solar time). */
-export function lonOffsetHours(lon: number): number {
-  return lon / 15;
-}
-
-export function formatOffset(lon: number): string {
-  const h = lonOffsetHours(lon);
-  const sign = h >= 0 ? '+' : '−';
-  const abs = Math.abs(h);
-  const hh = Math.floor(abs);
-  const mm = Math.round((abs - hh) * 60);
-  return mm ? `UTC${sign}${hh}:${String(mm).padStart(2, '0')}` : `UTC${sign}${hh}`;
+/** IANA timezone for a lat/lon (civil zones + DST via the runtime TZ database). */
+export function timeZoneAt(lat: number, lon: number): string {
+  try {
+    return tzlookup(lat, lon);
+  } catch {
+    const off = Math.round(lon / 15);
+    return off === 0 ? 'UTC' : `Etc/GMT${off > 0 ? '-' : '+'}${Math.abs(off)}`;
+  }
 }
 
 export interface LocalParts {
@@ -229,21 +227,43 @@ export interface LocalParts {
   s: number;
 }
 
-/** Split an instant into local mean-solar calendar parts at lon. */
-export function toLocalParts(date: Date, lon: number): LocalParts {
-  const local = new Date(date.getTime() + lonOffsetHours(lon) * 3600000);
+function readParts(date: Date, timeZone: string): LocalParts {
+  const bag: Record<string, string> = {};
+  for (const p of new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date)) {
+    if (p.type !== 'literal') bag[p.type] = p.value;
+  }
   return {
-    y: local.getUTCFullYear(),
-    mo: local.getUTCMonth() + 1,
-    day: local.getUTCDate(),
-    h: local.getUTCHours(),
-    m: local.getUTCMinutes(),
-    s: local.getUTCSeconds(),
+    y: Number(bag.year),
+    mo: Number(bag.month),
+    day: Number(bag.day),
+    h: Number(bag.hour),
+    m: Number(bag.minute),
+    s: Number(bag.second),
   };
 }
 
-/** Build UTC instant from local mean-solar parts at lon. */
+/** Offset ms: localWallAsUtcFields - actualUtc. */
+function offsetMsAt(date: Date, timeZone: string): number {
+  const p = readParts(date, timeZone);
+  return Date.UTC(p.y, p.mo - 1, p.day, p.h, p.m, p.s) - date.getTime();
+}
+
+export function toLocalParts(date: Date, lat: number, lon: number): LocalParts {
+  return readParts(date, timeZoneAt(lat, lon));
+}
+
+/** UTC instant from civil wall time at lat/lon (DST-aware). */
 export function fromLocalParts(
+  lat: number,
   lon: number,
   y: number,
   mo: number,
@@ -252,29 +272,50 @@ export function fromLocalParts(
   m: number,
   s = 0,
 ): Date {
-  return new Date(Date.UTC(y, mo - 1, day, h, m, s) - lonOffsetHours(lon) * 3600000);
+  const tz = timeZoneAt(lat, lon);
+  const wallAsUtc = Date.UTC(y, mo - 1, day, h, m, s);
+  let instant = wallAsUtc - offsetMsAt(new Date(wallAsUtc), tz);
+  instant = wallAsUtc - offsetMsAt(new Date(instant), tz);
+  return new Date(instant);
 }
 
-export function formatLocal(d: Date, lon: number): string {
-  const { h, m } = toLocalParts(d, lon);
+export function formatLocal(d: Date, lat: number, lon: number): string {
+  const { h, m } = toLocalParts(d, lat, lon);
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function localCivilTime(d: Date, lon: number): { h: number; m: number; s: number } {
-  const p = toLocalParts(d, lon);
-  return { h: p.h, m: p.m, s: p.s };
+/** e.g. "New York · EDT" */
+export function formatOffset(date: Date, lat: number, lon: number): string {
+  const tz = timeZoneAt(lat, lon);
+  const short =
+    new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
+      .formatToParts(date)
+      .find((p) => p.type === 'timeZoneName')?.value ?? '';
+  const city = tz.includes('/') ? tz.split('/').pop()!.replace(/_/g, ' ') : tz;
+  return `${city} · ${short}`;
 }
 
-/** Set local clock time, keeping the local calendar date. */
-export function setLocalCivilTime(base: Date, lon: number, h: number, m: number): Date {
-  const p = toLocalParts(base, lon);
-  return fromLocalParts(lon, p.y, p.mo, p.day, h, m);
+export function setLocalCivilTime(
+  base: Date,
+  lat: number,
+  lon: number,
+  h: number,
+  m: number,
+): Date {
+  const p = toLocalParts(base, lat, lon);
+  return fromLocalParts(lat, lon, p.y, p.mo, p.day, h, m);
 }
 
-/** Set local calendar date, keeping the local clock time. */
-export function setLocalDate(base: Date, lon: number, y: number, mo: number, day: number): Date {
-  const p = toLocalParts(base, lon);
-  return fromLocalParts(lon, y, mo, day, p.h, p.m, p.s);
+export function setLocalDate(
+  base: Date,
+  lat: number,
+  lon: number,
+  y: number,
+  mo: number,
+  day: number,
+): Date {
+  const p = toLocalParts(base, lat, lon);
+  return fromLocalParts(lat, lon, y, mo, day, p.h, p.m, p.s);
 }
 
 /** Approximate equinox/solstice UTC dates for a year. */
