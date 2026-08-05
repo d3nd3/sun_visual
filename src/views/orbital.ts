@@ -6,7 +6,8 @@ import {
   latLonToECEF,
   OBLIQUITY,
   solarPosition,
-  sunDirectionECEF,
+  subsolarLongitude,
+  sunDirectionEcliptic,
   sunENU,
 } from '../astro/sun';
 import { setLocation, state, subscribe } from '../state';
@@ -16,6 +17,7 @@ const UP_LEN = 0.75;
 const SUN_LEN = 0.95;
 const AXIS_LEN = 1.85;
 const ε = (OBLIQUITY * Math.PI) / 180;
+const DEG = Math.PI / 180;
 
 export interface OrbitalView {
   render: () => void;
@@ -169,13 +171,18 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     `,
   });
 
-  // Tip geographic north (local Y) toward +X by obliquity — visible from solar-plane camera
+  // Tip geographic north (local Y) toward +Z by obliquity (June sun is at +Z).
+  // Camera is locked to XZ = ecliptic, so this lean is always visible.
   const earthTilt = new THREE.Group();
-  earthTilt.rotation.z = ε;
+  earthTilt.rotation.x = ε;
   scene.add(earthTilt);
 
+  // Daily spin around the tipped polar axis
+  const earthSpin = new THREE.Group();
+  earthTilt.add(earthSpin);
+
   const earth = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 64), earthMat);
-  earthTilt.add(earth);
+  earthSpin.add(earth);
 
   const atmo = new THREE.Mesh(
     new THREE.SphereGeometry(R * 1.018, 48, 48),
@@ -205,7 +212,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       `,
     }),
   );
-  earthTilt.add(atmo);
+  earthSpin.add(atmo);
 
   // Polar axis in Earth frame (through geographic N/S) — leans vs solar plane
   const polarAxis = new THREE.Line(
@@ -215,17 +222,17 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     ]),
     new THREE.LineBasicMaterial({ color: 0x66ffcc }),
   );
-  earthTilt.add(polarAxis);
+  earthSpin.add(polarAxis);
   const nPole = makeTextSprite('N pole', '#66ffcc', 0.35);
   nPole.position.set(0, AXIS_LEN + 0.08, 0);
-  earthTilt.add(nPole);
+  earthSpin.add(nPole);
   const sPole = makeTextSprite('S pole', '#66ffcc', 0.35);
   sPole.position.set(0, -AXIS_LEN - 0.08, 0);
-  earthTilt.add(sPole);
+  earthSpin.add(sPole);
 
   const tiltBadge = makeTextSprite(`axis tilt ${OBLIQUITY.toFixed(1)}°`, '#66ffcc', 0.36);
   tiltBadge.position.set(0.55, AXIS_LEN * 0.55, 0);
-  earthTilt.add(tiltBadge);
+  earthSpin.add(tiltBadge);
 
   const eqRing = new THREE.Mesh(
     new THREE.RingGeometry(R * 1.04, R * 1.07, 64),
@@ -238,7 +245,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
     }),
   );
   eqRing.rotation.x = Math.PI / 2;
-  earthTilt.add(eqRing);
+  earthSpin.add(eqRing);
 
   const sunGroup = new THREE.Group();
   sunGroup.add(
@@ -297,13 +304,13 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   let angleLabel = makeTextSprite('zenith 0°', '#ff8866', 0.55);
   angleLabel.userData.text = 'zenith 0°';
   markerGroup.add(angleLabel);
-  earthTilt.add(markerGroup);
+  earthSpin.add(markerGroup);
 
   const subsolar = new THREE.Mesh(
     new THREE.SphereGeometry(0.028, 12, 12),
     new THREE.MeshBasicMaterial({ color: 0xffee55 }),
   );
-  earthTilt.add(subsolar);
+  earthSpin.add(subsolar);
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -394,13 +401,21 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
   }
 
   function updateSun(): void {
-    // Sun direction in geographic (Earth-local) frame, then into world via tilt
-    const sunLocal = ecefToThree(sunDirectionECEF(state.datetime)).normalize();
-    const sunWorld = sunLocal.clone().applyQuaternion(earthTilt.quaternion);
+    // Sun always on the ecliptic (solar) plane — y = 0
+    const [sx, sy, sz] = sunDirectionEcliptic(state.datetime);
+    const sunWorld = new THREE.Vector3(sx, sy, sz);
     earthMat.uniforms.sunDir.value.copy(sunWorld);
     (atmo.material as THREE.ShaderMaterial).uniforms.sunDir.value.copy(sunWorld);
     sunGroup.position.copy(sunWorld.clone().multiplyScalar(6));
-    subsolar.position.copy(sunLocal.clone().multiplyScalar(R * 1.02));
+
+    // Spin Earth so the subsolar meridian faces the sun
+    const subLon = subsolarLongitude(state.datetime);
+    const sunAng = Math.atan2(sz, sx); // ecliptic azimuth of sun
+    // Geographic lon maps to Three angle −lon; align that with sunAng
+    earthSpin.rotation.y = sunAng + subLon * DEG;
+
+    const decl = solarPosition(state.lat, state.lon, state.datetime).declination;
+    subsolar.position.copy(ecefToThree(latLonToECEF(decl, subLon)).multiplyScalar(R * 1.02));
   }
 
   function onPointer(e: PointerEvent): void {
@@ -416,7 +431,7 @@ export function createOrbitalView(container: HTMLElement): OrbitalView {
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObject(earth);
       if (!hits.length) return;
-      const local = earthTilt.worldToLocal(hits[0].point.clone()).normalize();
+      const local = earthSpin.worldToLocal(hits[0].point.clone()).normalize();
       const { lat, lon } = ecefToLatLon(...threeToEcef(local));
       setLocation(lat, lon);
     };

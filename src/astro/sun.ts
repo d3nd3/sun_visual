@@ -30,8 +30,8 @@ function julianCentury(jd: number): number {
   return (jd - 2451545) / 36525;
 }
 
-/** Geom mean lon, anomaly, ecc, etc. → declination + EoT */
-function sunParams(date: Date): { decl: number; eot: number; ra: number } {
+/** Geom mean lon, anomaly, ecc, etc. → declination + EoT + ecliptic longitude */
+function sunParams(date: Date): { decl: number; eot: number; ra: number; lambda: number } {
   const T = julianCentury(julianDay(date));
   const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
   const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
@@ -63,7 +63,7 @@ function sunParams(date: Date): { decl: number; eot: number; ra: number } {
       Math.cos(eps * DEG) * Math.sin(lambda * DEG),
       Math.cos(lambda * DEG),
     ) * RAD;
-  return { decl, eot, ra };
+  return { decl, eot, ra, lambda: ((lambda % 360) + 360) % 360 };
 }
 
 function utcHours(d: Date): number {
@@ -148,11 +148,31 @@ export function sunTimes(lat: number, lon: number, date: Date): SunTimes {
 /** Unit vector toward the Sun in ECEF (x=prime meridian equator, z=north). */
 export function sunDirectionECEF(date: Date): [number, number, number] {
   const { decl, eot } = sunParams(date);
-  // Subsolar longitude: where hour angle is 0
-  const st = utcHours(date) * 60 + eot; // at lon 0
-  const subLon = -(st / 4 - 180); // deg east
-  const subLat = decl;
-  return latLonToECEF(subLat, subLon);
+  const st = utcHours(date) * 60 + eot;
+  const subLon = -(st / 4 - 180);
+  return latLonToECEF(decl, subLon);
+}
+
+/** Apparent sun ecliptic longitude (deg), ≈0 at March equinox. */
+export function sunEclipticLongitude(date: Date): number {
+  return sunParams(date).lambda;
+}
+
+/** Geographic longitude where the sun is overhead (deg east). */
+export function subsolarLongitude(date: Date): number {
+  const { eot } = sunParams(date);
+  const st = utcHours(date) * 60 + eot;
+  let lon = -(st / 4 - 180);
+  return ((lon + 180) % 360) - 180;
+}
+
+/**
+ * Sun direction in the ecliptic frame (Y = ecliptic north, XZ = solar plane).
+ * Always lies in the solar plane (y = 0). λ=90° (June) → +Z.
+ */
+export function sunDirectionEcliptic(date: Date): [number, number, number] {
+  const λ = sunEclipticLongitude(date) * DEG;
+  return [Math.cos(λ), 0, Math.sin(λ)];
 }
 
 export function latLonToECEF(lat: number, lon: number): [number, number, number] {
