@@ -164,7 +164,7 @@ export function createControls(root: HTMLElement): () => void {
   const timeSlider = $<HTMLInputElement>('time-slider');
   const analemma = $<HTMLInputElement>('analemma');
   const seasonPaths = $<HTMLInputElement>('season-paths');
-  const trackSun = $<HTMLInputElement>('track-sun');
+  const trackSun = document.querySelector('#track-sun') as HTMLInputElement;
   const panelBody = $('panel-body');
   const toggleBtn = $('toggle-panel');
 
