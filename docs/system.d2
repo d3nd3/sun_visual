@@ -1,0 +1,63 @@
+# sun_visual — Earth and Sun in the browser: one time-and-place state, two Three.js views
+# Strokes only (no fills) so the light and dark diagram themes both stay readable.
+direction: right
+grid-columns: 2
+grid-rows: 2
+
+classes: {
+  entry: {style: {stroke: "#4f9cf9"; stroke-width: 2}}
+  core: {style: {stroke: "#9a7cf9"}}
+  state: {style: {stroke: "#e0a44a"}}
+  store: {style: {stroke: "#e0a44a"; stroke-width: 2}}
+  ext: {style: {stroke: "#6ac48a"; stroke-dash: 4}}
+}
+
+entry: Entry points {
+  direction: down
+  html: "index.html · skeleton: controls aside, mobile tabs, two view divs" {class: entry}
+  main: "main.ts · builds controls and both views, owns the rAF loop" {class: entry}
+  wiring: "main.ts · resize and mobile tab switch, layout gated on width above zero" {class: entry}
+  clock: "main.ts · playSpeed advances the datetime, notify capped at 10 per s" {class: entry}
+}
+
+state: State {
+  direction: down
+  store: "state.ts · one mutable object: place, datetime, playSpeed, 3 toggles" {class: store; shape: cylinder}
+  listeners: "state.ts listeners · setters notify, but both loops rerun every frame anyway" {class: store}
+  cache: "surface lastPathKey · paths rebuild only when place, day or a toggle moved" {class: store}
+  memory: "no persistence · reload returns to 40.7 N, 74.0 W and now" {class: store; shape: cylinder}
+}
+
+core: Core {
+  direction: down
+  grid-columns: 2
+  astro: "astro/sun.ts · NOAA sunParams, solarPosition, sunTimes, ECEF and ENU" {class: core}
+  civil: "astro/sun.ts · tz-lookup zone, Intl parts, two-pass DST offset" {class: core}
+  seasons: "seasonDates · Mar 20, Jun 21, Sep 22, Dec 21 at 12 UTC, no ephemeris" {class: core}
+  orbital: "orbital.ts · sun fixed at world +X, Earth yaw is ecliptic longitude" {class: core}
+  tilt: "orbital.ts · tilt is obliquity, spin yaw aligns ECEF sun with the tilted sun" {class: core}
+  shader: "orbital shader · smoothstep terminator, day times 1.75, night is city lights" {class: core}
+  marking: "orbital marker · pin, up and east and north axes, zenith wedge, subsolar" {class: core}
+  term: "orbital terminator · great circle on the sun normal, label tips past 2.5 deg" {class: core}
+  pick: "orbital pointerup · raycast the sphere, then world to local to lat and lon" {class: core}
+  surface: "surface.ts · camera stays at the origin, yaw and pitch copy the sun" {class: core}
+  sky: "surface sky shader · dome and star opacity from sun elevation, twilight band" {class: core}
+  paths: "surface paths · sunENU sampled 72 times a day at radius 52, above horizon" {class: core}
+  analemma: "surface analemma · same local clock every 2 days for a year, 12 beads" {class: core}
+  panel: "ui/controls.ts · panel, readouts, sliders, season jumps, GPS, collapse" {class: core}
+}
+
+external: External {
+  direction: down
+  grid-columns: 2
+  textures: "public/textures · earth_day and earth_night jpg, three.js planet maps" {class: ext}
+  tzdata: "tz-lookup · the whole IANA zone table compiled into the bundle" {class: ext}
+  fonts: "fonts.googleapis.com · DM Sans and IBM Plex Mono, two preconnects" {class: ext}
+  gps: "navigator.geolocation · high accuracy, 10 s timeout, place and time" {class: ext}
+  gpu: "WebGL · two contexts, both still rendering after a mobile tab switch" {class: ext}
+  pages: "GitHub Pages · workflow runs npm ci, tsc and vite build on push to main" {class: ext}
+}
+
+entry -> core
+core -> state
+core -> external

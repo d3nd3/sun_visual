@@ -2,6 +2,8 @@
 
 Browser-based Earth–Sun visualization (desktop + mobile). Pick a location on the globe, scrub date/time, and compare an orbital day/night view with a surface sky view.
 
+Prefer pictures? Start with **[HUMANS.md](HUMANS.md)**.
+
 ## Features
 
 - **Orbital view** — textured Earth with day/night terminator, atmosphere, subsolar marker; tap to set location; up/east/north and sun vectors
